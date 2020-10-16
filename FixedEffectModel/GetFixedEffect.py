@@ -16,11 +16,12 @@ def getfe(result, epsilon=1e-8):
     demean = result.demeaned_df.copy()
     coeff = result.params.values
     consist_col = result.consist_col
+    old_x = result.old_x
     category_col = result.category_col
     out_col = result.out_col
 
     y = data_df[out_col[0]].values
-    b_x = np.dot(coeff, data_df[consist_col].values.T)
+    b_x = np.dot(coeff, data_df[old_x].values.T)
     # print('b_x shape:', b_x.shape)
     ori_resid = y - b_x
     true_resid = ori_resid - demean['resid'].values

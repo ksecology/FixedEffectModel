@@ -8,5 +8,5 @@ from FixedEffectModel.FormTransfer import form_transfer
 from FixedEffectModel.to_latex import to_latex
 from FixedEffectModel.GetFixedEffect import getfe
 from FixedEffectModel.AlphaStdErr import alpha_std, alpha_std0
-
+from FixedEffectModel.WaldTest import waldtest, pinvx, cholx
 

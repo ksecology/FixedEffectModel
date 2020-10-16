@@ -40,11 +40,12 @@ class OLSFixed(object):
         self.data_df = None
         self.general_table = None
         self.std_err_name = None
-        self.f_df_full = None
-        self.f_df_proj = None
         self.consist_col = None
+        self.old_x = None
         self.category_col = None
         self.out_col = None
+        self.f_df_full = None
+        self.f_df_proj = None
 
     def conf_int(self, conf=0.05):
         tmpdf = pd.DataFrame(columns=[0, 1], index=list(self.params.index))

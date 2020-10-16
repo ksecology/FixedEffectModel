@@ -2,6 +2,15 @@ import numpy as np
 
 
 def demean_dataframe(df, consist_var, category_col, epsilon=1e-8, max_iter=100):
+    """
+
+    :param df: Dataframe
+    :param consist_var: List of columns need centering on fixed effects
+    :param category_col: List of fixed effects
+    :param epsilon: Tolerance
+    :param max_iter: Maximum iterations
+    :return: Demeaned dataframe
+    """
     n = df.shape[0]
     df_copy = df.copy()
     for consist in consist_var:
