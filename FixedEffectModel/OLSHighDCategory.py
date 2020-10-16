@@ -8,7 +8,6 @@ from FixedEffectModel.ClusterErr import *
 from FixedEffectModel.CalDf import cal_df
 from FixedEffectModel.CalFullModel import cal_fullmodel
 from FixedEffectModel.Forg import forg
-from FixedEffectModel.WaldTest import waldtest
 import statsmodels.api as sm
 from scipy.stats import t
 from scipy.stats import f
@@ -18,12 +17,9 @@ import pandas as pd
 
 
 def ols_high_d_category(data_df, consist_input=None, out_input=None, category_input=None, cluster_input=[],
-                        fake_x_input=[], iv_col_input=[],
                         formula=None, robust=False, c_method='cgm', psdef=True, epsilon=1e-8, max_iter=1e6, process=5):
     """
 
-    :param fake_x_input: List of endogenous variables
-    :param iv_col_input: List of instrument variables
     :param data_df: Dataframe of relevant data
     :param consist_input: List of continuous variables
     :param out_input: List of dependent variables(so far, only support one dependent variable)
@@ -44,102 +40,63 @@ def ols_high_d_category(data_df, consist_input=None, out_input=None, category_in
     if (consist_input is None) & (formula is None):
         raise NameError('You have to input list of variables name or formula')
     elif consist_input is None:
-        out_col, consist_col, category_col, cluster_col, fake_x, iv_col = form_transfer(formula)
+        out_col, consist_col, category_col, cluster_col = form_transfer(formula)
         print('dependent variable(s):', out_col)
         print('continuous variables:', consist_col)
         print('category variables(fixed effects):', category_col)
         print('cluster variables:', cluster_col)
-        if fake_x:
-            print('endogenous variables:', fake_x)
-            print('instruments:', iv_col)
     else:
-        out_col, consist_col, category_col, cluster_col, fake_x, iv_col = out_input, consist_input, category_input, \
-                                                                          cluster_input, fake_x_input, iv_col_input
+        out_col, consist_col, category_col, cluster_col = out_input, consist_input, category_input, cluster_input
+    consist_var = []
 
-    if category_col[0] == '0' or category_col == []:
+    if category_col[0] == '0':
         demeaned_df = data_df.copy()
-        # const_consist = sm.add_constant(demeaned_df[consist_col])
-        # # print(consist_col)
-        # consist_col = ['const'] + consist_col
-        # demeaned_df['const'] = const_consist['const']
-        # print('Since the model does not have fixed effect, add an intercept.')
+        const_consist = sm.add_constant(demeaned_df[consist_col])
+        print(consist_col)
+        consist_col = ['const'] + consist_col
+        demeaned_df['const'] = const_consist['const']
+        print('Since the model does not have fixed effect, add an intercept.')
         rank = 0
     else:
-        consist_var = []
         for i in consist_col:
-            consist_var.append(i)
-        for i in fake_x:
-            consist_var.append(i)
-        for i in iv_col:
             consist_var.append(i)
         consist_var.append(out_col[0])
         start = time.time()
         demeaned_df = demean_dataframe(data_df, consist_var, category_col, epsilon, max_iter)
         end = time.time()
-        print('demean time:', forg((end - start), 4), 's')
+        print('demean time:',forg((end - start),4),'s')
         start = time.process_time()
         rank = cal_df(data_df, category_col)
         end = time.process_time()
-        print('time used to calculate degree of freedom of category variables:', forg((end - start), 4), 's')
+        print('time used to calculate degree of freedom of category variables:',forg((end - start),4),'s')
         print('degree of freedom of category variables:', rank)
 
-    all_exo_x = consist_col + iv_col
-    iv_model = []
-    iv_result = []
-    hat_fake_x = []
-    if category_col[0] == '0' or category_col == []:
-        const_all_exo_x = sm.add_constant(demeaned_df[all_exo_x])
-        all_exo_x = ['iv_const'] + all_exo_x
-        demeaned_df['iv_const'] = const_all_exo_x['const']
-        print('Since the model does not have fixed effect, add an intercept during stage1 calculation.')
-
-    for i in fake_x:
-        model_iv = sm.OLS(demeaned_df[i], demeaned_df[all_exo_x])
-        result_iv = model_iv.fit()
-        iv_model.append(model_iv)
-        iv_result.append(result_iv)
-        iv_coeff = result_iv.params.values
-        demeaned_df["hat_" + i] = np.dot(iv_coeff, demeaned_df[all_exo_x].values.T)
-        hat_fake_x.append("hat_" + i)
-
-    new_x = consist_col + hat_fake_x
-    old_x = consist_col + fake_x
-
-    if category_col[0] == '0' or category_col == []:
-        const_new_x = sm.add_constant(demeaned_df[new_x])
-        new_x = ['const'] + new_x
-        old_x = ['const'] + old_x
-        demeaned_df['const'] = const_new_x['const']
-
-    model = sm.OLS(demeaned_df[out_col], demeaned_df[new_x])
+    model = sm.OLS(demeaned_df[out_col], demeaned_df[consist_col])
     result = model.fit()
-    coeff = result.params.values.reshape(len(new_x), 1)
-    real_resid = demeaned_df[out_col] - np.dot(demeaned_df[old_x], coeff)
-    demeaned_df['resid'] = real_resid
+    demeaned_df['resid'] = result.resid
 
     n = demeaned_df.shape[0]
-    k = len(new_x)
+    k = len(consist_col)
     f_result = OLSFixed()
     f_result.out_col = out_col
-    f_result.consist_col = new_x
-    f_result.old_x = old_x
+    f_result.consist_col = consist_col
     f_result.category_col = category_col
     f_result.data_df = data_df.copy()
     f_result.demeaned_df = demeaned_df
     f_result.params = result.params
     f_result.df = result.df_resid - rank
 
-    if (len(cluster_col) == 0 or cluster_col[0] == '0') & (robust is False):
+    if (len(cluster_col) == 0) & (robust is False):
         std_error = result.bse * np.sqrt((n - k) / (n - k - rank))
         covariance_matrix = result.normalized_cov_params * result.scale * result.df_resid / f_result.df
     elif (len(cluster_col) == 0) & (robust is True):
         start = time.process_time()
         covariance_matrix = robust_err(demeaned_df, consist_col, n, k, rank)
         end = time.process_time()
-        print('time used to calculate robust covariance matrix:', forg((end - start), 4), 's')
+        print('time used to calculate robust covariance matrix:',forg((end - start),4),'s')
         std_error = np.sqrt(np.diag(covariance_matrix))
     else:
-        if category_col[0] == '0' or category_col == []:
+        if category_col[0] == '0':
             nested = False
         else:
             start = time.process_time()
@@ -152,31 +109,25 @@ def ols_high_d_category(data_df, consist_input=None, out_input=None, category_in
         #     f_result.df = min(min_clust(data_df, cluster_col) - 1, f_result.df)
 
         start = time.process_time()
-        covariance_matrix = clustered_error(demeaned_df, new_x, cluster_col, n, k, rank, nested=nested,
+        covariance_matrix = clustered_error(demeaned_df, consist_col, cluster_col, n, k, rank, nested=nested,
                                             c_method=c_method, psdef=psdef)
         end = time.process_time()
-        print('time used to calculate clustered covariance matrix:', forg((end - start), 4), 's')
+        print('time used to calculate clustered covariance matrix:',forg((end - start),4),'s')
         std_error = np.sqrt(np.diag(covariance_matrix))
 
     f_result.bse = std_error
-    f_result.resid = demeaned_df['resid']
+    # print(f_result.bse)
     f_result.variance_matrix = covariance_matrix
     f_result.tvalues = f_result.params / f_result.bse
     f_result.pvalues = pd.Series(2 * t.sf(np.abs(f_result.tvalues), f_result.df), index=list(result.params.index))
-    proj_rss = sum(f_result.resid ** 2)
-    proj_tss = sum(((demeaned_df[out_col] - demeaned_df[out_col].mean()) ** 2).values)[0]
-
-    # proj_fvalue = (proj_tss - sum(result.resid**2)) * (len(data_df) - len(new_x) - rank) / (proj_rss * (rank + len(new_x) - 1))
-
-    f_result.rsquared = 1-proj_rss/proj_tss
-    f_result.rsquared_adj = 1 - (len(data_df) - 1) / (result.df_resid - rank) * (1 - f_result.rsquared)
-    # tmp1 = np.linalg.solve(f_result.variance_matrix, np.mat(f_result.params).T)
-    # tmp2 = np.dot(np.mat(f_result.params), tmp1)
-    # f_result.fvalue = tmp2[0, 0] / result.df_model
-    # f_result.fvalue = proj_fvalue
-    w = waldtest(f_result.params, f_result.variance_matrix)
-    f_result.fvalue = w/result.df_model
-
+    f_result.rsquared = result.rsquared
+    f_result.rsquared_adj = 1 - (len(data_df) - 1) / (result.df_resid - rank) * (1 - result.rsquared)
+    start = time.process_time()
+    tmp1 = np.linalg.solve(f_result.variance_matrix, np.mat(f_result.params).T)
+    tmp2 = np.dot(np.mat(f_result.params), tmp1)
+    f_result.fvalue = tmp2[0, 0] / result.df_model
+    end = time.process_time()
+    print('time used to calculate fvalue:',forg((end - start),4),'s')
     if len(cluster_col) > 0 and c_method == 'cgm':
         f_result.f_pvalue = f.sf(f_result.fvalue, result.df_model,
                                  min(min_clust(data_df, cluster_col) - 1, f_result.df))
@@ -187,12 +138,13 @@ def ols_high_d_category(data_df, consist_input=None, out_input=None, category_in
 
     # std err=diag( np.sqrt(result.normalized_cov_params*result.scale*result.df_resid/f_result.df) )
     f_result.fittedvalues = result.fittedvalues
-    f_result.full_rsquared, f_result.full_rsquared_adj, f_result.full_fvalue, f_result.full_f_pvalue, f_result.f_df_full \
-        = cal_fullmodel(data_df, out_col, new_x, rank, RSS=sum(f_result.resid ** 2), originRSS=sum(result.resid ** 2))
+    f_result.resid = result.resid
+    f_result.full_rsquared, f_result.full_rsquared_adj, f_result.full_fvalue, f_result.full_f_pvalue, f_result.f_df_full\
+        = cal_fullmodel(data_df, out_col, consist_col, rank, RSS=sum(result.resid ** 2))
     f_result.nobs = result.nobs
     f_result.yname = out_col
-    f_result.xname = new_x
-    f_result.resid_std_err = np.sqrt(sum(f_result.resid ** 2) / (result.df_resid - rank))
+    f_result.xname = consist_col
+    f_result.resid_std_err = np.sqrt(sum(result.resid ** 2) / (result.df_resid - rank))
     if len(cluster_col) == 0:
         f_result.cluster_method = 'no_cluster'
         if robust:
@@ -223,8 +175,6 @@ def ols_high_d_category_multi_results(data_df, models, table_header):
                                            model1['out_input'],
                                            model1['category_input'],
                                            model1['cluster_input'],
-                                           model1['fake_x_input'],
-                                           model1['iv_col_input'],
                                            formula=None,
                                            robust=False,
                                            c_method='cgm',

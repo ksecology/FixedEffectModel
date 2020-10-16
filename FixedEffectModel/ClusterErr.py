@@ -51,13 +51,13 @@ def clustered_error(demean, consist_col, cluster_col, n, k, rank, nested=False, 
 
     if len(cluster_col) == 1:
         G = np.unique(demeaned_df[cluster_col].values).shape[0]
-        # print('G:', G)
+        print('G:', G)
         middle = middle_term(demeaned_df, consist_col, cluster_col)
         m = np.dot(xpx_inv, middle)
         beta = np.dot(m, xpx_inv)
         scale = scale_df * G / (G - 1)
         beta = scale * beta
-        # print(beta)
+        print(beta)
         beta_list.append(beta)
     else:
         if c_method == 'cgm':
@@ -100,7 +100,7 @@ def clustered_error(demean, consist_col, cluster_col, n, k, rank, nested=False, 
                 middle = middle_term(demeaned_df, consist_col, [cluster])
                 G = np.unique(demeaned_df[cluster].values).shape[0]
                 G_array = np.append(G_array, G)
-                # print('G:', G)
+                print('G:', G)
                 m = np.dot(xpx_inv, middle)
                 beta = np.dot(m, xpx_inv)
                 beta_list.append(beta)

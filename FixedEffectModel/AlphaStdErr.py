@@ -27,7 +27,6 @@ def alpha_std0(result, formula, sample_num=100):
     demean_df = result.demeaned_df
     coeff = result.params.values
     consist_col = result.consist_col
-    old_x = result.old_x
     category_col = result.category_col
     out_col = result.out_col
     index_name = []
@@ -37,21 +36,21 @@ def alpha_std0(result, formula, sample_num=100):
         for l in m:
             name = category_col[i] + str(l)
             index_name.append(name)
-    copy_list = old_x.copy()
+    copy_list = consist_col.copy()
     copy_list.extend(category_col)
     alpha = np.zeros(sample_num, dtype=np.float64)
     n = data_df.shape[0]
     new_df = data_df[copy_list].copy()
-    y_pred = data_df[out_col[0]].values - demean_df['resid'].values
+    y_pred = data_df[out_col[0]].values-demean_df['resid'].values
     y = data_df[out_col[0]]
-    b_x = np.dot(coeff, data_df[old_x].values.T)
-    ori_resid = y - b_x
-    true_resid = ori_resid - demean_df['resid']
+    b_x = np.dot(coeff, data_df[consist_col].values.T)
+    ori_resid = y-b_x
+    true_resid = ori_resid-demean_df['resid']
     true_alpha = projection2df(new_df, true_resid, category_col, index_name)
     demeaned_resid = demean_df['resid'].values
     final_result = do_operation(true_alpha, formula)
-    ori_x = new_df[old_x].values.T
-    # print(final_result)
+    ori_x = new_df[consist_col].values.T
+    print(final_result)
     if not is_estimable(new_df, true_resid, category_col, formula, index_name):
         print('the function you defined is not estimable')
     else:
@@ -60,17 +59,17 @@ def alpha_std0(result, formula, sample_num=100):
             y_new = y_pred + sample_resid
             new_df['y_new'] = y_new
             demeaned_new = demean_dataframe(new_df, ['y_new'], category_col)
-            model = sm.OLS(demeaned_new['y_new'], demean_df[old_x])
+            model = sm.OLS(demeaned_new['y_new'], demean_df[consist_col])
             result = model.fit()
             y = new_df['y_new'].values
             b_x = np.dot(result.params.values, ori_x)
-            b_array = y - b_x
+            b_array = y-b_x
             pb_array = result.resid
-            target_array = b_array - pb_array
+            target_array = b_array-pb_array
             alpha_df = projection2df(new_df, target_array, category_col, index_name)
             result = do_operation(alpha_df, formula)
             alpha[i] = result
-    return 'est:' + str(final_result), 'std:' + str(np.std(alpha))
+    return final_result, np.std(alpha)
 
 
 def alpha_std(result, formula, sample_num=100):
@@ -86,7 +85,6 @@ def alpha_std(result, formula, sample_num=100):
     demean_df = result.demeaned_df
     coeff = result.params.values
     consist_col = result.consist_col
-    old_x = result.old_x
     category_col = result.category_col
     out_col = result.out_col
 
@@ -97,21 +95,21 @@ def alpha_std(result, formula, sample_num=100):
         for l in m:
             name = category_col[i] + '_' + str(l)
             index_name.append(name)
-    copy_list = old_x.copy()
+    copy_list = consist_col.copy()
     copy_list.extend(category_col)
     alpha = np.zeros(sample_num, dtype=np.float64)
     n = data_df.shape[0]
     new_df = data_df[copy_list].copy()
-    y_pred = data_df[out_col[0]].values - demean_df['resid'].values
+    y_pred = data_df[out_col[0]].values-demean_df['resid'].values
     y = data_df[out_col[0]]
-    b_x = np.dot(coeff, data_df[old_x].values.T)
-    ori_resid = y - b_x
-    true_resid = ori_resid - demean_df['resid']
+    b_x = np.dot(coeff, data_df[consist_col].values.T)
+    ori_resid = y-b_x
+    true_resid = ori_resid-demean_df['resid']
     true_alpha = projection2df(new_df, true_resid, category_col, index_name)
     demeaned_resid = demean_df['resid'].values
     final_result = do_operation(true_alpha, formula)
-    ori_x = new_df[old_x].values.T
-    #     print(final_result)
+    ori_x = new_df[consist_col].values.T
+#     print(final_result)
     if not is_estimable(new_df, true_resid, category_col, formula, index_name):
         print('the function you defined is not estimable')
     else:
@@ -120,9 +118,12 @@ def alpha_std(result, formula, sample_num=100):
         alpha_result = []
         for i in range(sample_num):
             alpha_result.append(pool.apply_async(bootstrap, args=(new_df, demeaned_resid, y_pred, n, category_col,
-                                                                  demean_df, old_x, formula, index_name, i)))
+                                                                  demean_df,consist_col, formula, index_name, i)))
         pool.close()
         pool.join()
         for i in range(len(alpha_result)):
             alpha[i] = alpha_result[i].get()
-        return 'est:' + str(final_result), 'std:' + str(np.std(alpha))
+        return 'est:'+str(final_result), 'std:'+str(np.std(alpha))
+
+
+
