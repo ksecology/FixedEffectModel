@@ -1,6 +1,7 @@
 FixedEffectModel
 =======================
 This is a Python Package that provides solutions for linear model with high dimensional fixed effects, including support for calculation in variance (robust variance and multi-way cluster variance), fixed effects, and standard error of fixed effects.
+It also supports model with instrument variables.
 
 Installation
 -------------
@@ -13,7 +14,7 @@ Main Functions
 -----------
 |Function name| Description|Usage
 |-------------|------------|----|
-|ols_high_d_category|get main result|ols_high_d_category(data_df, consist_input=None, out_input=None, category_input=None, cluster_input=[],formula=None, robust=False, c_method='cgm', psdef=True, epsilon=1e-8, max_iter=1e6, process=5)|
+|ols_high_d_category|get main result|ols_high_d_category(data_df, consist_input=None, out_input=None, category_input=None, cluster_input=[],fake_x_input=[], iv_col_input=[], formula=None, robust=False, c_method='cgm', psdef=True, epsilon=1e-8, max_iter=1e6, process=5)|
 |ols_high_d_category_multi_results|get results of multiple models based on same dataset|ols_high_d_category_multi_results(data_df, models, table_header)|
 |getfe|get fixed effects|getfe(result, epsilon=1e-8)|
 |alpha_std|get standard error of fixed effects|alpha_std(result, formula, sample_num=100)|
@@ -27,9 +28,21 @@ import pandas as pd
 
 df = pd.read_csv('yourdata.csv')
 
-#define model:'dependent variable ~ continuous variable|fixed_effect|clusters'
-formula = 'y~x+x2|id+firm|id+firm'
+#define model
+#you can define the model through defining formula like 'dependent variable ~ continuous variable|fixed_effect|clusters|(endogenous variables ~ instrument variables)'
+formula_without_iv = 'y~x+x2|id+firm|id+firm'
+formula_without_cluster = 'y~x+x2|id+firm|0|(Q|W~x3+x4+x5)'
+formula = 'y~x+x2|id+firm|id+firm|(Q|W~x3+x4+x5)'
 result1 = FEM.ols_high_d_category(df, formula = formula,robust=False,c_method = 'cgm',epsilon = 1e-8,psdef= True,max_iter = 1e6)
+
+#or you can define the model through defining each part
+consist_input = ['x','x2']
+output_input = ['y']
+category_input = ['id','firm']
+cluster_input = ['id','firm']
+endo_input = ['Q','W']
+iv_input = ['x3','x4','x5']
+result1 = FEM.ols_high_d_category(df,consist_input,out_input,category_input,cluster_input,endo_input,iv_input,formula=None,robust=False,c_method = 'cgm',epsilon = 1e-8,max_iter = 1e6)
 
 #show result
 result1.summary()
@@ -52,4 +65,5 @@ Requirements
 - Pandas and its dependencies (Numpy, etc.)
 - Scipy and its dependencies
 - statsmodels and its dependencies
+- networkx
 
