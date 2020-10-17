@@ -1,17 +1,26 @@
-FixedEffectModel
+FixedEffectModel: A Python Package for Linear Model with High Dimensional Fixed Effects.
 =======================
-This is a Python Package that provides solutions for linear model with high dimensional fixed effects, including support for calculation in variance (robust variance and multi-way cluster variance), fixed effects, and standard error of fixed effects.
-It also supports model with instrument variables.
+**FixedEffectModel** is a Python Package designed and built by **Kuaishou DA ecology group**. It provides solutions for linear model with high dimensional fixed effects,including support for calculation in variance (robust variance and multi-way cluster variance), fixed effects, and standard error of fixed effects.It also supports model with instrument variables.
 
-Installation
--------------
+<details>
+<summary><strong><em>Table of Contents</em></strong></summary>
+-[Installation](#installation)
+-[Main Functions](#main-fucntions)
+-[Example](#example)
+-[Requirements](#requirements)
+-[Citation](#citation)
+-[Feedback](#feedback)
+</details>
+
+# Installation
+
 Install this package directly from PyPI
 ```bash
 $ pip install FixedEffectModel
 ```
 
-Main Functions
------------
+# Main Functions
+
 |Function name| Description|Usage
 |-------------|------------|----|
 |ols_high_d_category|get main result|ols_high_d_category(data_df, consist_input=None, out_input=None, category_input=None, cluster_input=[],fake_x_input=[], iv_col_input=[], formula=None, robust=False, c_method='cgm', psdef=True, epsilon=1e-8, max_iter=1e6, process=5)|
@@ -20,8 +29,8 @@ Main Functions
 |alpha_std|get standard error of fixed effects|alpha_std(result, formula, sample_num=100)|
 
 
-Example
-----------
+# Example
+
 ```python
 import FixedEffectModel.api as FEM
 import pandas as pd
@@ -58,12 +67,27 @@ alpha_std(result1, formula = expression , sample_num=100)
 ```
 
 
-
-Requirements
-------------
+# Requirements
 - Python 3.6+
 - Pandas and its dependencies (Numpy, etc.)
 - Scipy and its dependencies
 - statsmodels and its dependencies
 - networkx
 
+# Citation
+If you use FixedEffectModel in your research, please cite us as follows:
+
+Kuaishou DA Ecology. **FixedEffectModel: A Python Package for Linear Model with High Dimensional Fixed Effects.**<https://github.com/ksecology/FixedEffectModel>,2020.Version 0.x
+
+BibTex:
+```
+@misc{FixedEffectModel,
+  author={Kuaishou DA Ecology},
+  title={{FixedEffectModel: {A Python Package for Linear Model with High Dimensional Fixed Effects}},
+  howpublished={https://github.com/ksecology/FixedEffectModel},
+  note={Version 0.x},
+  year={2020}
+}
+```
+# Feedback
+This package welcomes feedback. If you have any additional questions or comments, please contact <da_ecology@kuaishou.com>.
