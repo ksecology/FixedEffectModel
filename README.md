@@ -2,16 +2,6 @@ FixedEffectModel: A Python Package for Linear Model with High Dimensional Fixed 
 =======================
 **FixedEffectModel** is a Python Package designed and built by **Kuaishou DA ecology group**. It provides solutions for linear model with high dimensional fixed effects,including support for calculation in variance (robust variance and multi-way cluster variance), fixed effects, and standard error of fixed effects.It also supports model with instrument variables.
 
-<details>
-<summary><strong><em>Table of Contents</em></strong></summary>
--[Installation](#installation)
--[Main Functions](#main-fucntions)
--[Example](#example)
--[Requirements](#requirements)
--[Citation](#citation)
--[Feedback](#feedback)
-</details>
-
 # Installation
 
 Install this package directly from PyPI
