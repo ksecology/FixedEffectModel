@@ -83,8 +83,8 @@ BibTex:
 This package welcomes feedback. If you have any additional questions or comments, please contact <da_ecology@kuaishou.com>.
 
 
-#Reference
-[1] Simen Gaure(2010).  lfe: Linear Group Fixed Effects. R package. version:v2.8-5.1 URL:https://www.rdocumentation.org/packages/lfe/versions/2.8-5.1
+# Reference
+[1] Simen Gaure(2019).  lfe: Linear Group Fixed Effects. R package. version:v2.8-5.1 URL:https://www.rdocumentation.org/packages/lfe/versions/2.8-5.1
 
 [2] A Colin Cameron and Douglas L Miller. A practitioner’s guide to cluster-robust inference. Journal of human resources, 50(2):317–372, 2015.
 
