@@ -81,3 +81,15 @@ BibTex:
 ```
 # Feedback
 This package welcomes feedback. If you have any additional questions or comments, please contact <da_ecology@kuaishou.com>.
+
+
+#Reference
+[1] Simen Gaure(2010).  lfe: Linear Group Fixed Effects. R package. version:v2.8-5.1 URL:https://www.rdocumentation.org/packages/lfe/versions/2.8-5.1
+
+[2] A Colin Cameron and Douglas L Miller. A practitioner’s guide to cluster-robust inference. Journal of human resources, 50(2):317–372, 2015.
+
+[3] Simen Gaure. Ols with multiple high dimensional category variables. Computational Statistics & Data Analysis, 66:8–18, 2013.
+
+[4] Douglas L Miller, A Colin Cameron, and Jonah Gelbach. Robust inference with multi-way clustering. Technical report, Working Paper, 2009.
+
+[5] Jeffrey M Wooldridge. Econometric analysis of cross section and panel data. MIT press, 2010.
