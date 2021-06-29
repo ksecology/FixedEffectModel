@@ -1,11 +1,11 @@
 import os
 import numpy as np
 import statsmodels.api as sm
-from FixedEffectModel.DemeanDataframe import demean_dataframe
-from FixedEffectModel.EstimableCheck import projection2df
-from FixedEffectModel.Operation import do_operation
+from .DemeanDataframe import demean_dataframe
+from .EstimableCheck import projection2df
+from .Operation import do_operation
 
-
+#bootstrap package 2.0
 def bootstrap(new, demeaned_resid, y_pred, n, category_col, demean_df, consist_col, formula, index_name, i):
     """
 

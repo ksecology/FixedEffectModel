@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.linalg as la
+import warnings
 
 
 def waldtest(coef, V):
@@ -25,16 +26,16 @@ def pinvx(x):
 
 
 def cholx(x, eps=1e-6):
-    x_rank = np.linalg.matrix_rank(x)
     n = x.shape[0]
-    if x_rank == n:
+    dpstrf = la.get_lapack_funcs('pstrf', [x])
+    res = dpstrf(x, tol=eps)
+    rank = res[2]
+    if rank == n:
         chp = np.linalg.cholesky(x)
         badvars = None
     else:
-        dpstrf = la.get_lapack_funcs('pstrf', [x])
-        res = dpstrf(x, tol=eps)
+        warnings.warn('The variance matrix is either rank-deficient or indefinite.')
         pivot = res[1]
-        rank = res[2]
         badvars = pivot[rank:n]
         new_var = list(range(1, n+1))
         final_var = [item-1 for item in new_var if item not in list(badvars)]

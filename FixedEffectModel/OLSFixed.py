@@ -1,9 +1,10 @@
-from FixedEffectModel.Forg import forg
+from .Forg import forg
 import time
 import pandas as pd
-from statsmodels.iolib.tableformatting import (gen_fmt, fmt_2)
-from statsmodels.iolib.table import SimpleTable
+#from statsmodels.iolib.tableformatting import (gen_fmt, fmt_2)
 from itertools import zip_longest
+from .TableFormat import gen_fmt, fmt_2
+from statsmodels.iolib.table import SimpleTable
 from statsmodels.compat.python import lrange, lmap, lzip
 from scipy.stats import t
 
@@ -18,7 +19,6 @@ class OLSFixed(object):
         self.summary = None
         self.covar_matrix = None
         self.fittedvalues = None
-        self.resid = None
         self.rsquared = None
         self.rsquared_adj = None
         self.full_rsquared = None
@@ -28,7 +28,6 @@ class OLSFixed(object):
         self.full_fvalue = None
         self.full_f_pvalue = None
         self.variance_matrix = None
-        self.fittedvalues = None
         self.resid = None
         self.nobs = None
         self.yname = None
@@ -38,14 +37,26 @@ class OLSFixed(object):
         self.cluster_method = None
         self.demeaned_df = None
         self.data_df = None
-        self.general_table = None
-        self.std_err_name = None
         self.f_df_full = None
         self.f_df_proj = None
+        self.general_table = None
+        self.std_err_name = None
+        self.old_x = None
         self.consist_col = None
         self.category_col = None
         self.out_col = None
+        self.treatment_input = None
+        
+        # 2021/01/07 - iv related test
+        self.fake_x = None
+        self.iv_col = None        
+        self.f_stat_first_stage = None
+        self.f_stat_first_stage_pval = None
 
+        # 2021/03/24 - record original input
+        self.consist_input = None
+
+        
     def conf_int(self, conf=0.05):
         tmpdf = pd.DataFrame(columns=[0, 1], index=list(self.params.index))
         tmpdf[0] = self.params - t.ppf(1 - conf / 2, self.df) * self.bse
@@ -123,19 +134,19 @@ class OLSFixed(object):
         gen_table_left = SimpleTable(gen_data_left,
                                      gen_header,
                                      gen_stubs_left,
-                                     title=gen_title,
+                                     title = gen_title,
                                      txt_fmt=gen_fmt
                                      )
         gen_stubs_right, gen_data_right = zip_longest(*gen_right)
         gen_table_right = SimpleTable(gen_data_right,
                                       gen_header,
                                       gen_stubs_right,
-                                      title=gen_title,
+                                      title = gen_title,
                                       txt_fmt=gen_fmt
                                       )
         gen_table_left.extend_right(gen_table_right)
         self.general_table = gen_table_left
-
+                
         # Parameters part of the summary table
         s_alp = alpha / 2
         c_alp = 1 - alpha / 2
@@ -147,7 +158,10 @@ class OLSFixed(object):
             self.std_err_name = 'cluster std err'
         else:
             self.std_err_name = 'std err'
-        param_header = ['coef', self.std_err_name, 't', 'P>|t|', '[' + str(s_alp),
+        param_header = ['coef', self.std_err_name, 
+                        't', 
+                        'P>|t|', 
+                        '[' + str(s_alp),
                         str(c_alp) + ']']  # alp + ' Conf. Interval'
         params_stubs = xname
         params = self.params.copy()
@@ -169,14 +183,40 @@ class OLSFixed(object):
                            ["%#6.4f" % (prob_stat[i]) for i in exog_len],
                            ["%#6.4f" % conf_int[0][i] for i in exog_len],
                            ["%#6.4f" % conf_int[1][i] for i in exog_len])
+        
+               
         self.parameter_table = SimpleTable(params_data,
                                            param_header,
                                            params_stubs,
                                            title=None,
-                                           txt_fmt=fmt_2
-                                           )
+                                           txt_fmt=fmt_2)
+        
+        
+        
+        #2020/01/07 iv part of the summary table
+        if len(self.fake_x) > 0:
+            iv_header = ['First-Stage F-stat','P > F'] 
+            gen_iv = []
+            for i in self.fake_x:
+                f_stat_iv_i = forg(self.f_stat_first_stage[self.fake_x.index(i)], 4)
+                f_stat_iv_pval_i = forg(self.f_stat_first_stage_pval[self.fake_x.index(i)], 4)
+                
+                endog_list_i = f_stat_iv_i, f_stat_iv_pval_i
+                gen_iv.append(endog_list_i)
+                
+            gen_data_iv = gen_iv
+            gen_stubs_iv = self.fake_x
+            
+            self.gen_table_iv = SimpleTable(gen_data_iv,
+                                            iv_header,
+                                            gen_stubs_iv,
+                                            title = None,
+                                            txt_fmt = fmt_2)  
+            
         print(self.general_table)
-        print(self.parameter_table)
+        print(self.parameter_table)        
+        if len(self.fake_x) > 0:
+            print(self.gen_table_iv )
         return
 
     def to_excel(self, file=None):

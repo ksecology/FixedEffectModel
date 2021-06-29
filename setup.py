@@ -9,13 +9,13 @@ def readme():
 dependencies = [
     'pandas>=0.16.0',
     'numpy>=1.9.2',
-    'scipy',
-    'statsmodels',
-    'networkx',
+    'scipy>=1.6.0',
+    'statsmodels>=0.12.2',
+    'networkx>=2.5',
 ]
 
 setup(name='FixedEffectModel',
-      version='0.0.2',
+      version='0.0.3',
       description='Solutions to linear model with high dimensional fixed effects.',
       long_description=readme(),
       long_description_content_type="text/markdown",

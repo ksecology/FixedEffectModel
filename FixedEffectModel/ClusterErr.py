@@ -3,7 +3,7 @@ import warnings
 import numpy as np
 
 
-def clustered_error(demean, consist_col, cluster_col, n, k, rank, nested=False, c_method='cgm', psdef=True):
+def clustered_error(demean, consist_col, category_col, cluster_col, n, k, k0, rank, nested=False, c_method='cgm', psdef=True):
     """
 
     This function is used to calculate clustered variance matrix based on equation (x'px)^-1 * middle *(x'px)^-1.
@@ -34,30 +34,32 @@ def clustered_error(demean, consist_col, cluster_col, n, k, rank, nested=False, 
         raise NameError('cgm2 must be applied to multi-clusters')
     beta_list = []
     xpx = np.dot(demean[consist_col].values.T, demean[consist_col].values)
-    xpx_inv = np.linalg.inv(xpx)
-    # rank = cal_df(demean,category_col)
-    # print('rank:',rank)
-    # print(xpx_inv)
+    # 2020/11/26
+    xpx_inv = np.linalg.pinv(xpx)
     demeaned_df = demean.copy()
-    # n = demeaned_df.shape[0]
     G_array = np.array([])
-    # print('n:', n)
-    # k = len(category_col)
-    # print('k:', k)
-    if nested:
-        scale_df = (n - 1) / (n - k - 1)
+    
+    if nested:            
+        if (len(category_col) == 0 ):
+            scale_df = (n - 1) / (n - k - rank)
+        else:   
+            scale_df = (n - 1) / (n - k + k0 - rank ) 
     else:
-        scale_df = (n - 1) / (n - k - rank)
-
+        if (len(category_col) == 0 ):            
+            scale_df = (n - 1) / (n - k - rank)       
+        else:
+            scale_df = (n - 1) / (n - k + k0 - rank ) 
+        
+                
     if len(cluster_col) == 1:
         G = np.unique(demeaned_df[cluster_col].values).shape[0]
-        print('G:', G)
+ 
         middle = middle_term(demeaned_df, consist_col, cluster_col)
         m = np.dot(xpx_inv, middle)
         beta = np.dot(m, xpx_inv)
+        
         scale = scale_df * G / (G - 1)
         beta = scale * beta
-        print(beta)
         beta_list.append(beta)
     else:
         if c_method == 'cgm':
@@ -100,7 +102,7 @@ def clustered_error(demean, consist_col, cluster_col, n, k, rank, nested=False, 
                 middle = middle_term(demeaned_df, consist_col, [cluster])
                 G = np.unique(demeaned_df[cluster].values).shape[0]
                 G_array = np.append(G_array, G)
-                print('G:', G)
+                # print('G:', G)
                 m = np.dot(xpx_inv, middle)
                 beta = np.dot(m, xpx_inv)
                 beta_list.append(beta)

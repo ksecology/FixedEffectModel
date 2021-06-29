@@ -6,7 +6,7 @@ is estimable.
 import numpy as np
 import pandas as pd
 
-from FixedEffectModel.Operation import do_operation
+from .Operation import do_operation
 
 
 def is_estimable(data_df, b_x, category_col, formula, index_name):
@@ -46,12 +46,14 @@ def projection2df(data_df, b_x, category_col, index_name, epsilon=1e-5, startpoi
     update = 10
     iter_loops = int((max_iter // n) + 1)
     # print('max_whole_iter:', iter_loops)
+    # index = np.zeros()
     for loop in range(iter_loops):
         if loop == 0:
             for i in range(n):
                 d_ij = 0
                 for j in range(e):
                     index = np.where(category_unique_val[j] == fe[i][j])
+                    # print(index)
                     d_i_index[j] = d_ij + index[0][0]
                     d_ij += length_list[j]
                 loop_index[i] = d_i_index

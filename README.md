@@ -13,46 +13,69 @@ $ pip install FixedEffectModel
 
 |Function name| Description|Usage
 |-------------|------------|----|
-|ols_high_d_category|get main result|ols_high_d_category(data_df, consist_input=None, out_input=None, category_input=None, cluster_input=[],fake_x_input=[], iv_col_input=[], formula=None, robust=False, c_method='cgm', psdef=True, epsilon=1e-8, max_iter=1e6, process=5)|
+|ols_high_d_category|get main result|ols_high_d_category(data_df,consist_input=None,out_input=None,category_input=[],cluster_input=[],fake_x_input=[],iv_col_input=[],treatment_input=None,formula=None,robust=False,c_method='cgm',psdef=True,epsilon=1e-08,max_iter=1e6,process=5,noint=False,**kwargs,)|
 |ols_high_d_category_multi_results|get results of multiple models based on same dataset|ols_high_d_category_multi_results(data_df, models, table_header)|
-|getfe|get fixed effects|getfe(result, epsilon=1e-8)|
+|getfe|get fixed effects|getfe(result, epsilon=1e-08, normalize=False, category_input=[])|
 |alpha_std|get standard error of fixed effects|alpha_std(result, formula, sample_num=100)|
-
+|ivtest|if specified an iv model in ols_high_d_category, provide iv test result|ivtest(result)
 
 # Example
 
 ```python
-import FixedEffectModel.api as FEM
-import pandas as pd
+# need to install from kuaishou product base
+from FixedEffectModel.api import *
+from utils.panel_dgp import gen_data
 
-df = pd.read_csv('yourdata.csv')
+N = 100
+T = 10
+beta = [-3,-1.5,1,2,3,4,5] 
+alpha = 0.9
+ate = 1 
+exp_date = 2
+
+#generate sample data
+df = gen_data(N, T, beta, ate, exp_date)
 
 #define model
 #you can define the model through defining formula like 'dependent variable ~ continuous variable|fixed_effect|clusters|(endogenous variables ~ instrument variables)'
-formula_without_iv = 'y~x+x2|id+firm|id+firm'
-formula_without_cluster = 'y~x+x2|id+firm|0|(Q|W~x3+x4+x5)'
-formula = 'y~x+x2|id+firm|id+firm|(Q|W~x3+x4+x5)'
-result1 = FEM.ols_high_d_category(df, formula = formula,robust=False,c_method = 'cgm',epsilon = 1e-8,psdef= True,max_iter = 1e6)
+formula_without_iv = 'y~x_1+x_2|id+time|id+time'
+formula_without_cluster = 'y~x_1+x_2|id+time|0|(x_3|x_4~x_5+x_6)'
+formula = 'y~x_1+x_2|id+time|id+time|(x_3|x_4~x_5+x_6)'
+result1 = ols_high_d_category(df, 
+                              formula = formula,
+                              robust=False,
+                              c_method = 'cgm',
+                              epsilon = 1e-8,
+                              psdef= True,
+                              max_iter = 1e6)
 
 #or you can define the model through defining each part
-consist_input = ['x','x2']
-output_input = ['y']
-category_input = ['id','firm']
-cluster_input = ['id','firm']
-endo_input = ['Q','W']
-iv_input = ['x3','x4','x5']
-result1 = FEM.ols_high_d_category(df,consist_input,out_input,category_input,cluster_input,endo_input,iv_input,formula=None,robust=False,c_method = 'cgm',epsilon = 1e-8,max_iter = 1e6)
+consist_input = ['x_1','x_2']
+out_input = ['y']
+category_input = ['id','time']
+cluster_input = ['id','time']
+endo_input = ['x_3','x_4']
+iv_input = ['x_5','x_6']
+result1 = ols_high_d_category(df,
+                              consist_input,
+                              out_input,
+                              category_input,
+                              cluster_input,
+                              endo_input,
+                              iv_input,
+                              formula=None,
+                              robust=False,
+                              c_method = 'cgm',
+                              epsilon = 1e-8,
+                              max_iter = 1e6)
 
 #show result
 result1.summary()
 
 #get fixed effects
-getfe(result1 , epsilon=1e-8)
+getfe(result1)
 
-#define the expression of standard error of difference between two fixed effect estimations you want to know
-expression = 'id_1-id_2'
-#get standard error
-alpha_std(result1, formula = expression , sample_num=100)
+
 
 ```
 
