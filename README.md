@@ -78,7 +78,41 @@ getfe(result1)
 
 
 ```
+You can also do DID with treatment_input option:
+```python
+# need to install from kuaishou product base
+from FixedEffectModel.api import *
+from utils.panel_dgp import gen_data
 
+N = 100
+T = 10
+beta = [-3,-1.5,1,2,3,4,5] 
+alpha = 0.9
+ate = 1 
+exp_date = 2
+
+#generate sample data
+df = gen_data(N, T, beta, ate, exp_date)
+
+#did wrt group effect
+formula = 'y~0|id+time|0|0'
+result = ols_high_d_category(data_df,
+                             formula=formula,
+                             treatment_input ={'treatment_col':'treatment',
+                                               'exp_date':5,
+                                               'effect':'group'})
+result.summary()
+
+#did wrt individual effect
+formula = 'y~0|id+time|0|0'
+result = ols_high_d_category(data_df,
+                             formula=formula,
+                             treatment_input ={'treatment_col':'treatment',
+                                               'exp_date':5,
+                                               'effect':'individual'})
+result.summary()
+
+```
 
 # Requirements
 - Python 3.6+
