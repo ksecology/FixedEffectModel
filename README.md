@@ -1,6 +1,26 @@
+
+
+[![Downloads](https://pepy.tech/badge/fixedeffectmodel)](https://pypi.org/project/FixedEffectModel/)
+[![Downloads](https://pepy.tech/badge/fixedeffectmodel/month)](https://pypi.org/project/FixedEffectModel/)
+[![Downloads](https://pepy.tech/badge/fixedeffectmodel/week)](https://pypi.org/project/FixedEffectModel/)
+
+
 FixedEffectModel: A Python Package for Linear Model with High Dimensional Fixed Effects.
 =======================
-**FixedEffectModel** is a Python Package designed and built by **Kuaishou DA ecology group**. It provides solutions for linear model with high dimensional fixed effects,including support for calculation in variance (robust variance and multi-way cluster variance), fixed effects, and standard error of fixed effects. It also supports model with instrument variables (will upgrade in late Nov.2020).
+**FixedEffectModel** is a Python Package designed and 
+built by **Kuaishou DA ecology group**. It is used to estimate the class of 
+linear models which handles panel data. Panel data refers to the type of data
+when time series and cross-sectional data are combined. 
+
+# Main Features
+*   Linear model 
+*   Linear model with high dimensional fixed effects
+*   Difference-in-difference model with parallel checking plot
+*   Instrumental variable model 
+*   Robust/white standard error 
+*   Multi-way cluster standard error
+*   Instrumental variable model tests, including weak iv test (cragg-dolnald statistics + stock and yogo critical values), over-identification test (sargan/Basmann test), endogeneity test (durbin test)
+
 
 # Installation
 
