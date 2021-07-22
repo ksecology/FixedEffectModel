@@ -14,6 +14,9 @@ import statsmodels.api as sm
 #2021
 def ivtest(result):
     """
+    This function is used to obtain iv test result.
+    :param result: result of olshighdcategory function
+    :return: table of test results
     """
     if result.iv_col == []:
         raise NameError('there is no iv')

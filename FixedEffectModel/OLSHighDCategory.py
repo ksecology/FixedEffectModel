@@ -60,7 +60,7 @@ def ols_high_d_category(data_df,
     :param epsilon: tolerance of the demean process
     :param max_iter: max iteration of the demean process
     :param process: number of process in multiprocessing(only in multi-way clusters variance calculating)
-    :param noint: force nointercept option
+    :param noint: force no intercept option
     :return:params,df,bse,tvalues,pvalues,rsquared,rsquared_adj,fvalue,f_pvalue,variance_matrix,fittedvalues,resid,summary
     **kwargs:some hidden option not supposed to be used by user
     """
