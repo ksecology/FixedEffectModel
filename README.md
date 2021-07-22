@@ -4,9 +4,9 @@ FixedEffectModel: A Python Package for Linear Model with High Dimensional Fixed 
 
 
 
-[![Downloads](https://pepy.tech/badge/fixedeffectmodel)](https://pypi.org/project/FixedEffectModel/)
-[![Downloads](https://pepy.tech/badge/fixedeffectmodel/month)](https://pypi.org/project/FixedEffectModel/)
-[![Downloads](https://pepy.tech/badge/fixedeffectmodel/week)](https://pypi.org/project/FixedEffectModel/)
+[![Downloads](https://pepy.tech/badge/fixedeffectmodel)](https://pepy.tech/project/fixedeffectmodel)
+[![Downloads](https://pepy.tech/badge/fixedeffectmodel/month)](https://pepy.tech/project/fixedeffectmodel)
+[![Downloads](https://pepy.tech/badge/fixedeffectmodel/week)](https://pepy.tech/project/fixedeffectmodel)
 
 
 
