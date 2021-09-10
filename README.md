@@ -24,6 +24,8 @@ when time series and cross-sectional data are combined.
 *   Multi-way cluster standard error
 *   Instrumental variable model tests, including weak iv test (cragg-dolnald statistics+stock and yogo critical values), over-identification test (sargan/Basmann test), endogeneity test (durbin test)
 
+For instrumental variable model, we now only provide two stage least square estimator and produce second stage regression result.
+In our next release we will include GMM method and robust standard error based on GMM. 
 
 # Installation
 
@@ -114,6 +116,7 @@ Currently there are five main function you can call:
 |getfe|get fixed effects|getfe(result, epsilon=1e-08, normalize=False, category_input=[])|
 |alpha_std|get standard error of fixed effects|alpha_std(result, formula, sample_num=100)|
 |ivtest|if specified an iv model in ols_high_d_category, provide iv test result|ivtest(result)
+
 
 ### ols_high_d_category
 The main estimation function, provide results for a single model.
