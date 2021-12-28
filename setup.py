@@ -1,5 +1,7 @@
 from setuptools import setup, find_packages
-
+from setuptools import setup
+import os
+import re
 
 def readme():
     with open('README.md') as f:
