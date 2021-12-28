@@ -50,9 +50,7 @@ from fixedeffect.iv import iv2sls, ivgmm, ivtest
 from fixedeffect.fe import fixedeffect, did, getfe
 from fixedeffect.utils.panel_dgp import gen_data
 ```
-gen_data is the function we use to simulate data. The function above generated
-a balanced panel data set with number of cross-sectional id equals 100 and time 
-id equals 10. 
+*gen_data* is the function we use to simulate data. 
 
 ### Data
 
@@ -73,8 +71,11 @@ Ihe the above simulated dataset, "beta" are true coefficients,
 #### Instrumental variables estimation
 We include two function: "iv2sls" and "iv2gmm" for instrumental variable regression.
 ##### iv2sls
-This function return two-stage least square estimation results. 
-The estimation is achieved by:
+This function return two-stage least square estimation results. Define *y* as
+the dependent variable, *x_1* as exogenous variable, *x_2* as endogenous variable,
+*x_3* and *x_4* are instrumental variables. *id* and *time* are cross sectional 
+id and time id.
+An IV two-way fixed effect model estimated by two-stage least square is achieved by using:
 ```python
 formula = 'y ~ x_1|id+time|0|(x_2~x_3+x_4)'
 model_iv2sls = iv2sls(data_df = df,
@@ -99,7 +100,7 @@ model_iv2sls = iv2sls(data_df = df,
 result = model_iv2sls.fit()
 result.summary()
 ```
-You can obtain estimation result using either grammar above. 
+The two grammars above yield identical results. 
 We provide specification test for iv models:
 ```python
 ivtest(result1)
@@ -108,10 +109,10 @@ Three tests are included: weak iv test (Cragg-Dolnald statistics + Stock and Yog
 over-identification test (Sargan/Basmann test), and endogeneity test (Durbin test).
 
 ##### ivgmm
-This function returns one-step gmm estimation result. 
-The estimation is achieved by:
+This function returns one-step gmm estimation result. With same variables definition,
+ estimation is achieved by:
 ```python
-formula = 'y ~ x_1|id|0|(x_2~x_3+x_4)'
+formula = 'y ~ x_1|id+time|0|(x_2~x_3+x_4)'
 
 model_ivgmm = ivgmm(data_df = df,
                     formula = formula)
@@ -137,7 +138,11 @@ result.summary()
 ```
 #### Fixed Effect Model
 This function returns fixed effect model estimation result. 
-The estimation is achieved by:
+Define *y* as
+the dependent variable, *x_1* as independent variable, *id* and *time* are cross sectional 
+ID and time ID.
+Following code yield estimation of a two-way fixed effect model with two-way cluster
+standard error:
 ```python
 formula = 'y ~ x_1|id+time|id+time|0'
 
@@ -147,9 +152,7 @@ model_fe = fixedeffect(data_df = df,
 result = model_fe.fit()
 result.summary()
 ```
-Sample code above estimate a two-way fixed effect model with cluster standard
-error clustering at the individual and time level.
-You can also achieve the same estimation results by:
+or
 ```python
 exog_x = ['x_1']
 y = ['y']
@@ -167,7 +170,7 @@ result = model_fe.fit()
 result.summary()
 ```
 #### Difference in Difference
-DID is simply a specific fixed effect model. We provide a function of DID to help 
+DID is simply a specific type of fixed effect model. We provide a function of DID to help 
 simplify the estimation process. The regular DID estimation is achieved using 
 following command:
 ```python
@@ -182,7 +185,7 @@ model_did = did(data_df = df,
 result = model_did.fit()
 result.summary()
 ```
-"exp_date" is the first date that the experiment begins, "treatment" is the
+"*exp_date*" is the first date that the experiment begins, "*treatment*" is the
 column name of the treatment variable. This command estimate the equation below:
 
 <img src="https://latex.codecogs.com/svg.image?y_{it}&space;=&space;Treat_i&space;Post_t&space;\beta_1&space;&plus;&space;&space;Treat_i\beta_2&space;&plus;&space;Post_t&space;\beta_3&space;&plus;&space;\varepsilon_{it}" title="y_{it} = Treat_i Post_t \beta_1 + Treat_i\beta_2 + Post_t \beta_3 + \varepsilon_{it}" />
@@ -330,96 +333,76 @@ Return a test result table of iv tests.
 
 ```python
 # need to install from kuaishou product base
-from FixedEffectModel.api import *
-from utils.panel_dgp import gen_data
+import numpy as np
+import pandas as pd
+from fixedeffect.iv import iv2sls, ivgmm,ivtest
+from fixedeffect.fe import fixedeffect, did,getfe
+from fixedeffect.utils.panel_dgp import gen_data 
+from fixedeffect.iv import ivtest
 
 N = 100
 T = 10
-beta = [-3,-1.5,1,2,3,4,5] 
-alpha = 0.9
-ate = 1 
-exp_date = 2
+beta = [-3,1,2,3,4]
+ate = 1
+exp_date = 5
 
 #generate sample data
 df = gen_data(N, T, beta, ate, exp_date)
 
-#define model
-#you can define the model through defining formula like 'dependent variable ~ continuous variable|fixed_effect|clusters|(endogenous variables ~ instrument variables)'
-formula_without_iv = 'y~x_1+x_2|id+time|id+time'
-formula_without_cluster = 'y~x_1+x_2|id+time|0|(x_3|x_4~x_5+x_6)'
-formula = 'y~x_1+x_2|id+time|id+time|(x_3|x_4~x_5+x_6)'
-result1 = ols_high_d_category(df, 
-                              formula = formula,
-                              robust=False,
-                              c_method = 'cgm',
-                              epsilon = 1e-8,
-                              psdef= True,
-                              max_iter = 1e6)
-
-#or you can define the model through defining each part
-consist_input = ['x_1','x_2']
-out_input = ['y']
-category_input = ['id','time']
-cluster_input = ['id','time']
-endo_input = ['x_3','x_4']
-iv_input = ['x_5','x_6']
-result1 = ols_high_d_category(df,
-                              consist_input,
-                              out_input,
-                              category_input,
-                              cluster_input,
-                              endo_input,
-                              iv_input,
-                              formula=None,
-                              robust=False,
-                              c_method = 'cgm',
-                              epsilon = 1e-8,
-                              max_iter = 1e6)
-
-#show result
-result1.summary()
-
-#get fixed effects
-getfe(result1)
-
-
-
-```
-You can also do DID with treatment_input option:
-```python
-# need to install from kuaishou product base
-from FixedEffectModel.api import *
-from utils.panel_dgp import gen_data
-
-N = 100
-T = 10
-beta = [-3,-1.5,1,2,3,4,5] 
-alpha = 0.9
-ate = 1 
-exp_date = 2
-
-#generate sample data
-df = gen_data(N, T, beta, ate, exp_date)
-
-#did wrt group effect
-formula = 'y~0|id+time|0|0'
-result = ols_high_d_category(data_df,
-                             formula=formula,
-                             treatment_input ={'treatment_col':'treatment',
-                                               'exp_date':5,
-                                               'effect':'group'})
+#------------------------------#
+#define instrumental variable model
+# iv2sls 
+formula = 'y ~ x_1|id+time|0|(x_2~x_3+x_4)'
+model_iv2sls = iv2sls(data_df = df,
+                      formula = formula)
+result = model_iv2sls.fit()
 result.summary()
 
-#did wrt individual effect
-formula = 'y~0|id+time|0|0'
-result = ols_high_d_category(data_df,
-                             formula=formula,
-                             treatment_input ={'treatment_col':'treatment',
-                                               'exp_date':5,
-                                               'effect':'individual'})
+# ivgmm 
+formula = 'y ~ x_1|id|0|(x_2~x_3+x_4)'
+
+model_ivgmm = ivgmm(data_df = df,
+                    formula = formula)
+result = model_ivgmm.fit()
 result.summary()
 
+# obtain iv test results
+ivtest(result)
+
+#------------------------------#
+#define fixed effect model
+exog_x = ['x_1']
+y = ['y']
+category = ['id','time']
+cluster = ['id','time']
+
+
+model_fe = fixedeffect(data_df = df,
+                      dependent = y,
+                      exog_x = exog_x,
+                      category = category,
+                      cluster = cluster)
+
+result = model_fe.fit()
+result.summary()
+
+#obtain fixed effect 
+getfe(result)
+
+#------------------------------#
+#define DID model
+formula = 'y ~ 0|0|0|0'
+
+model_did = did(data_df = df,
+                formula = formula,
+                treatment = ['treatment'],
+                csid = ['id'],
+                tsid = ['time'],
+                exp_date=2)
+result = model_did.fit()
+result.summary()
 ```
+
 
 # Requirements
 - Python 3.6+
