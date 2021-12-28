@@ -1,33 +1,37 @@
-from .Forg import forg
 import pandas as pd
 import numpy as np
 import scipy as sp
 from io import StringIO 
 import warnings
-from .TableFormat import gen_fmt, fmt_2
 from statsmodels.iolib.table import SimpleTable
-from statsmodels.compat.python import lrange, lmap, lzip
 from scipy.stats import chi2
-from scipy.stats import f
 import statsmodels.api as sm
 
-#2021
+from ..utils.Forg import forg
+from ..utils.TableFormat import gen_fmt, fmt_2
+
+#function generate instrumental variables test
 def ivtest(result):
     """
-    This function is used to obtain iv test result.
-    :param result: result of olshighdcategory function
-    :return: table of test results
+    :param result: List of endogenous variables
+    :return: a table of result
     """
-    if result.iv_col == []:
+    if result.iv == []:
         raise NameError('there is no iv')
 
-    consist_col = result.consist_col
-    iv_col      = result.iv_col
-    out_col     = result.out_col
-    fake_x      = result.fake_x
-    old_x       = result.old_x
+    exog_x = result.exog_x
+    iv_col = result.iv
+    out_col = result.dependent
+    endog_x = result.endog_x
 
-    for i in fake_x:
+    if result.endog_x:
+        old_x = exog_x + result.endog_x
+        if 'const' in result.x_second_stage:
+            old_x = ['const'] + old_x
+    else:
+        old_x = exog_x
+
+    for i in endog_x:
         if i in old_x:
             old_x.remove(i) 
 
@@ -37,7 +41,7 @@ def ivtest(result):
     z       = demeaned_df[iv_col].values
     y       = demeaned_df[out_col].values
     x_exog  = demeaned_df[old_x].values
-    x_endog = demeaned_df[fake_x].values
+    x_endog = demeaned_df[endog_x].values
     z_      = demeaned_df[all_exo_x].values
 
     nobs = result.demeaned_df.shape[0]
@@ -144,7 +148,7 @@ def ivtest(result):
     df_5_2 = pd.read_csv(tab_5_2)
     
     
-    N = len(fake_x)    
+    N = len(endog_x)
     critical_val = []
 
     if N==1:
@@ -169,7 +173,7 @@ def ivtest(result):
     #-------------------- over identification --------------------#
     #-------------------------------------------------------------# 
         
-    if len(iv_col) <= len(fake_x):
+    if len(iv_col) <= len(endog_x):
         warnings.warn("There is no over identification, number of iv <= number of endogenous vars")
         sargan_stat = 0
         sargan_stat_p_val = 0
@@ -177,7 +181,7 @@ def ivtest(result):
         b_stat_p_val = 0
     else:
         resid = result.demeaned_df['resid'].values
-        df_overid = len(all_exo_x)-len(consist_col) # number of overidentification constraints
+        df_overid = len(all_exo_x)-len(exog_x) # number of overidentification constraints
 
         s_n_1 = np.dot(np.dot(resid,pz_full),resid.T)
         s_n_2 = np.dot(resid,resid.T)/nobs
@@ -188,7 +192,7 @@ def ivtest(result):
         b_2 = (np.dot(np.dot(resid,m_z_full),resid.T))/(nobs - len(all_exo_x))
         b_stat = round(b_1/b_2,6)
         b_stat_p_val = round(1 - chi2.cdf(b_stat, df_overid),6)
-        #b_stat_p_val = f.sf(b_stat, df_overid, nobs - len(all_exo_x))
+
 
     #-------------------------------------------------------------#    
     #-------------------- endogeneity test    --------------------#
@@ -196,12 +200,11 @@ def ivtest(result):
     uc = demeaned_df['resid'].values
 
 
-    model_test = sm.OLS(demeaned_df[out_col], demeaned_df[old_x + fake_x])
+    model_test = sm.OLS(demeaned_df[out_col], demeaned_df[old_x + endog_x])
     result_test = model_test.fit()
 
-    #x_exog2 = demeaned_df[old_x+fake_x].values
     u_e = result_test.resid
-    z_test = demeaned_df[old_x + iv_col + fake_x ].values
+    z_test = demeaned_df[old_x + iv_col + endog_x ].values
     zpz_test = np.dot(z_test.T,z_test)
     zpz_test_inv = np.linalg.inv(zpz_test)
     pz_test = np.dot(np.dot(z_test,zpz_test_inv),z_test.T)
@@ -214,7 +217,7 @@ def ivtest(result):
     d2 = np.dot(np.dot(u_c.T,pz_full),u_c)
     d3 = np.dot(u_e.T,u_e)/nobs 
     durbin_stat = (d1-d2)/d3
-    durbin_stat_p_val = round(1 - chi2.cdf(durbin_stat, len(fake_x)),6)
+    durbin_stat_p_val = round(1 - chi2.cdf(durbin_stat, len(endog_x)),6)
     
         
 

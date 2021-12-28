@@ -35,23 +35,24 @@ def gencrossprod(data_df, consist_col):
      
     return data_df
 
-#this function only generate cross product terms in consist variables
+# this function only generate cross product terms in consist variables
 def gencrossprod_dataset(data_df,
                          out_col,
                          consist_col,
                          category_col,
-                         did_opt,
-                         no_print = False):
+                         treatment,
+                         exp_date,
+                         did_effect,
+                         no_print = False,
+                         figsize = (2,1),
+                         fontsize = 15):
 
     csid = category_col[0]
     tsid = category_col[1]
+    treatment_col = treatment[0]
 
-    treatment_col = did_opt['treatment_col']
-    exp_date = did_opt['exp_date']
-    did_effect = did_opt['effect']
-
-    if did_effect=='group':
-        warnings.warn('You are doing DID with group effect')
+    if did_effect=='treatment':
+        warnings.warn('You are doing DID with group effect where group is exp or base')
     else:
         warnings.warn('You are doing DID with individual effect')
 
@@ -62,10 +63,17 @@ def gencrossprod_dataset(data_df,
     #generate treatment*post_experiment
     data_df[str(treatment_col)+"*post_experiment"] = data_df["post_experiment"]*data_df[treatment_col]
     tsid_items = list(data_df[tsid].unique())
+    tsid_items.sort()
 
-    #generate the time dummies    
-    time_dummies = pd.get_dummies(data_df[tsid]) 
-    pre_treatment_date = tsid_items[tsid_items.index(exp_date)-1]
+    #generate the time dummies
+    time_dummies = pd.get_dummies(data_df[tsid])
+    if exp_date in tsid_items:
+        pre_treatment_date = tsid_items[tsid_items.index(exp_date) - 1]
+    else:
+        tsid_items_ = tsid_items + [exp_date]
+        tsid_items_.sort()
+        pre_treatment_date = tsid_items_[tsid_items_.index(exp_date) - 1]
+
     time_dummies = time_dummies.drop(pre_treatment_date,axis = 1)
     time_dummies = time_dummies.sort_index(axis = 1)
 
@@ -101,9 +109,19 @@ def gencrossprod_dataset(data_df,
     se.extend(list(model_plot.bse[list(time_dummies_interactions)]))
 
     if no_print==False:
-        plt.errorbar(xvalue, param, se,  marker = '^', capsize = 5, elinewidth = 2, markeredgewidth = 2)
+        plt.figure(figsize=figsize)
+        #plt.title('parallel check of ' + out_col[0])
+
+        ax = plt.subplot(111, xlabel='x', ylabel='y', title='title')
+        ax.set_title('parallel check of ' + out_col[0])
+
+        for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
+                     ax.get_xticklabels() + ax.get_yticklabels()):
+            item.set_fontsize(fontsize)
+        ax.errorbar(xvalue, param, se, marker='^', capsize=5, elinewidth=2, markeredgewidth=2)
+
         plt.xticks(rotation=60)
-        plt.title('parallel check of '+out_col[0])
+
         plt.grid(True)
         plt.show()
         plt.close()

@@ -21,9 +21,7 @@ def cal_fullmodel(data_df, out_col, consist_col, category_col, rank, RSS, origin
     TSS = float("{:.6f}".format(TSS))
     originRSS = float("{:.6f}".format(originRSS))
         
-        
     rsquared = 1 - RSS / TSS
-    #rsquared_adj = 1 - (len(data_df) - 1) / (len(data_df) - len(consist_col) - rank) * (1 - rsquared)
     if category_col != []:
         rsquared_adj = 1 - len(data_df) / (len(data_df) - len(consist_col) - rank + k0) * (1 - rsquared)
     else:

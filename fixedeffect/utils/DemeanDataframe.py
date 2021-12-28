@@ -1,6 +1,12 @@
 import numpy as np
-import statsmodels.api as sm
+import pandas as pd
+from pandas import (
+    get_dummies,
+)
+from numpy.linalg import lstsq
+import warnings
 
+# before version 0.0.3, still use epsilon when demean
 def demean_dataframe(df, consist_var, category_col, epsilon=1e-8, max_iter=1e6):
     """
     :param df: Dataframe
@@ -11,13 +17,26 @@ def demean_dataframe(df, consist_var, category_col, epsilon=1e-8, max_iter=1e6):
     :return: Demeaned dataframe
     """
     n = df.shape[0]
-    df_copy = df.copy()   
+    df_copy = df.copy()
+    is_unbalance = False
+
+    # if there's only one category variable, doesn't matter if balance or not.
+    ## is_unbalance option is only used when there're two category variables
+    if len(category_col)>1:
+        n_cat = 1
+        for cat in category_col:
+            n_cat = n_cat * df[cat].nunique()
+        if n_cat > df.shape[0]:
+            warnings.warn('panel is unbalanced')
+            is_unbalance = True
     
-    #2020/12/23: 只做一次demean的时候，为了节约时间和内存，不比较mse和epsilon
+    #2020/12/23 when demean only once, no need to converge
     if len(category_col) == 1:
         cat = category_col[0]
         for consist in consist_var:            
-            df_copy[consist] = df[consist] - df.groupby(cat)[consist].transform('mean')                                            
+            df_copy[consist] = df[consist] - df.groupby(cat)[consist].transform('mean')
+    elif  len(category_col) == 2:
+        df_copy = demean_dataframe_two_cat(df_copy, consist_var, category_col, is_unbalance)
     else:
         for consist in consist_var:
             mse = 10
@@ -36,6 +55,61 @@ def demean_dataframe(df, consist_var, category_col, epsilon=1e-8, max_iter=1e6):
                     raise RuntimeWarning('Exceeds the maximum iteration counts, please recheck dataset')
                     break
     return df_copy
+
+## 2021/12/16: to avoid convergence issue when panel is too unbalanced
+# demean when category len equals 2
+def demean_dataframe_two_cat(df_copy, consist_var, category_col, is_unbalance):
+    """
+    reference: Baltagi http://library.wbi.ac.id/repository/27.pdf page 176, equation (9.30)
+    :param df_copy: Dataframe
+    :param consist_var: List of columns need centering on fixed effects
+    :param category_col: List of fixed effects
+    :return: Demeaned dataframe
+    """
+    if is_unbalance:
+        # first determine which is uid or the category that has the most items
+        max_ncat = df_copy[category_col[0]].nunique()
+        max_cat  = category_col[0]
+        for cat in category_col:
+            if df_copy[cat].nunique() >= max_ncat:
+                max_ncat = df_copy[cat].nunique()
+                max_cat = cat
+
+        min_cat = category_col.copy()
+        min_cat.remove(max_cat)
+        min_cat = min_cat[0]
+
+        df_copy.sort_values(by=[max_cat, min_cat], inplace=True)
+
+        # demean on the first category variable, max_cat
+        for consist in consist_var:
+            df_copy[consist] = df_copy[consist] - df_copy.groupby(max_cat)[consist].transform('mean')
+
+        dummies = get_dummies(df_copy[min_cat])  # time dummies
+        dummies[max_cat] = df_copy[max_cat]
+        dummies[min_cat] = df_copy[min_cat]
+        dummies[max_cat] = dummies[max_cat].apply(str)
+        dummies[min_cat] = dummies[min_cat].apply(str)
+        dummies.set_index([max_cat, min_cat], inplace = True)
+
+        group_mu = dummies.groupby(level=max_cat).transform("mean")
+        out = dummies - group_mu  # q_delta_1 @ delta_2
+
+        e = df_copy[consist_var].values
+        d = out.values
+        resid = e - d @ lstsq(d, e, rcond=None)[0]
+
+        df_out = pd.DataFrame(data=resid, columns=consist_var)
+        df_out[max_cat] = df_copy[max_cat]
+        df_out[min_cat] = df_copy[min_cat]
+
+    else: # balance
+        for consist in consist_var:
+            for cat in category_col:
+                df_copy[consist] = df_copy[consist] - df_copy.groupby(cat)[consist].transform('mean')
+        df_out = df_copy
+
+    return df_out
 
 
 def transform_mean(df_arr, cat_idx, unq_idx, consist_arr):

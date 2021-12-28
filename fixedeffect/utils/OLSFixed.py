@@ -11,6 +11,7 @@ from scipy.stats import t
 
 class OLSFixed(object):
     def __init(self):
+        self.model = None
         self.params = None
         self.df = None
         self.bse = None
@@ -46,26 +47,29 @@ class OLSFixed(object):
         self.category_col = None
         self.out_col = None
         self.treatment_input = None
-        
+
+
         # 2021/01/07 - iv related test
-        self.fake_x = None
-        self.iv_col = None        
+        self.endog_x = None
+        self.exog_x = None
+        self.orignal_exog_x = None
+        self.cluster = None
+
+        self.iv = None
         self.f_stat_first_stage = None
         self.f_stat_first_stage_pval = None
+        self.x_second_stage = None
+        self.x_first_stage = None
 
-        # 2021/03/24 - record original input
-        self.consist_input = None
 
-        
+
     def conf_int(self, conf=0.05):
         tmpdf = pd.DataFrame(columns=[0, 1], index=list(self.params.index))
         tmpdf[0] = self.params - t.ppf(1 - conf / 2, self.df) * self.bse
         tmpdf[1] = self.params + t.ppf(1 - conf / 2, self.df) * self.bse
         return tmpdf
 
-    def summary(self, yname=None, xname=None, title=0, alpha=.05,
-                returns='text', model_info=None):
-        # General part of the summary table
+    def summary(self, yname=None, xname=None, title=0, alpha=.05):
         if title == 0:
             title = 'High Dimensional Fixed Effect Regression Results'
 
@@ -109,17 +113,44 @@ class OLSFixed(object):
         f_pvalue = forg(self.f_pvalue, 4)
         full_fvalue = forg(self.full_fvalue, 4)
         full_f_pvalue = forg(self.full_f_pvalue, 4)
-        gen_right = [('R-squared(proj model):', [r_squared]),
-                     ('Adj. R-squared(proj model):', [rsquared_adj]),
-                     ('R-squared(full model):', [full_rsquared]),
-                     ('Adj. R-squared(full model):', [full_rsquared_adj]),
-                     ('F-statistic(proj model):', [fvalue]),
-                     ('Prob (F-statistic (proj model)):', [f_pvalue]),
-                     ('DoF of F-test (proj model):', [self.f_df_proj]),
-                     ('F-statistic(full model):', [full_fvalue]),
-                     ('Prob (F-statistic (full model)):', [full_f_pvalue]),
-                     ('DoF of F-test (full model):', [self.f_df_full])
-                     ]
+
+
+        # gen_right = [('R-squared(proj model):', [r_squared]),
+        #              ('Adj. R-squared(proj model):', [rsquared_adj]),
+        #              ('R-squared(full model):', [full_rsquared]),
+        #              ('Adj. R-squared(full model):', [full_rsquared_adj]),
+        #              ('F-statistic(proj model):', [fvalue]),
+        #              ('Prob (F-statistic (proj model)):', [f_pvalue]),
+        #              ('DoF of F-test (proj model):', [self.f_df_proj]),
+        #              ('F-statistic(full model):', [full_fvalue]),
+        #              ('Prob (F-statistic (full model)):', [full_f_pvalue]),
+        #              ('DoF of F-test (full model):', [self.f_df_full])
+        #              ]
+
+        #2021/09/26
+        if (self.model =='ivgmm') or (self.model=='iv2sls'):
+            gen_right = [('R-squared:', [r_squared]),
+                         ('Adj. R-squared:', [rsquared_adj]),
+                         ('F-statistic:', [fvalue]),
+                         ('Prob (F-statistic):', [f_pvalue]),
+                         ('DoF of F-test:', [self.f_df_proj]),
+                         #('F-statistic(full model):', [full_fvalue]),
+                         #('Prob (F-statistic (full model)):', [full_f_pvalue]),
+                         #('DoF of F-test (full model):', [self.f_df_full])
+                         ]
+        else:
+            gen_right = [('R-squared(proj model):', [r_squared]),
+                         ('Adj. R-squared(proj model):', [rsquared_adj]),
+                         ('R-squared(full model):', [full_rsquared]),
+                         ('Adj. R-squared(full model):', [full_rsquared_adj]),
+                         ('F-statistic(proj model):', [fvalue]),
+                         ('Prob (F-statistic (proj model)):', [f_pvalue]),
+                         ('DoF of F-test (proj model):', [self.f_df_proj]),
+                         ('F-statistic(full model):', [full_fvalue]),
+                         ('Prob (F-statistic (full model)):', [full_f_pvalue]),
+                         ('DoF of F-test (full model):', [self.f_df_full])
+                         ]
+
         # pad both tables to equal number of rows
         if len(gen_right) < len(gen_left):
             # fill up with blank lines to same length
@@ -134,19 +165,19 @@ class OLSFixed(object):
         gen_table_left = SimpleTable(gen_data_left,
                                      gen_header,
                                      gen_stubs_left,
-                                     title = gen_title,
+                                     title=gen_title,
                                      txt_fmt=gen_fmt
                                      )
         gen_stubs_right, gen_data_right = zip_longest(*gen_right)
         gen_table_right = SimpleTable(gen_data_right,
                                       gen_header,
                                       gen_stubs_right,
-                                      title = gen_title,
+                                      title=gen_title,
                                       txt_fmt=gen_fmt
                                       )
         gen_table_left.extend_right(gen_table_right)
         self.general_table = gen_table_left
-                
+
         # Parameters part of the summary table
         s_alp = alpha / 2
         c_alp = 1 - alpha / 2
@@ -158,15 +189,17 @@ class OLSFixed(object):
             self.std_err_name = 'cluster std err'
         else:
             self.std_err_name = 'std err'
-        param_header = ['coef', self.std_err_name, 
-                        't', 
-                        'P>|t|', 
+        param_header = ['coef', self.std_err_name,
+                        't',
+                        'P>|t|',
                         '[' + str(s_alp),
                         str(c_alp) + ']']  # alp + ' Conf. Interval'
         params_stubs = xname
         params = self.params.copy()
         conf_int = self.conf_int(alpha)
         std_err = self.bse.copy()
+
+
         exog_len = lrange(len(xname))
         tstat = self.tvalues.copy()
         prob_stat = self.pvalues.copy()
@@ -183,40 +216,38 @@ class OLSFixed(object):
                            ["%#6.4f" % (prob_stat[i]) for i in exog_len],
                            ["%#6.4f" % conf_int[0][i] for i in exog_len],
                            ["%#6.4f" % conf_int[1][i] for i in exog_len])
-        
-               
+
         self.parameter_table = SimpleTable(params_data,
                                            param_header,
                                            params_stubs,
                                            title=None,
                                            txt_fmt=fmt_2)
-        
-        
-        
-        #2020/01/07 iv part of the summary table
-        if len(self.fake_x) > 0:
-            iv_header = ['First-Stage F-stat','P > F'] 
+
+        # 2020/01/07 iv part of the summary table
+        if len(self.endog_x) > 0:
+            iv_header = ['First-Stage F-stat', 'P > F']
             gen_iv = []
-            for i in self.fake_x:
-                f_stat_iv_i = forg(self.f_stat_first_stage[self.fake_x.index(i)], 4)
-                f_stat_iv_pval_i = forg(self.f_stat_first_stage_pval[self.fake_x.index(i)], 4)
-                
+            for i in self.endog_x:
+                f_stat_iv_i = forg(self.f_stat_first_stage[self.endog_x.index(i)], 4)
+                f_stat_iv_pval_i = forg(self.f_stat_first_stage_pval[self.endog_x.index(i)], 4)
+
                 endog_list_i = f_stat_iv_i, f_stat_iv_pval_i
                 gen_iv.append(endog_list_i)
-                
+
             gen_data_iv = gen_iv
-            gen_stubs_iv = self.fake_x
-            
+            gen_stubs_iv = self.endog_x
+
             self.gen_table_iv = SimpleTable(gen_data_iv,
                                             iv_header,
                                             gen_stubs_iv,
                                             title = None,
-                                            txt_fmt = fmt_2)  
-            
+                                            txt_fmt = fmt_2)
+
         print(self.general_table)
-        print(self.parameter_table)        
-        if len(self.fake_x) > 0:
-            print(self.gen_table_iv )
+        print(self.parameter_table)
+        if len(self.endog_x) > 0:
+            print(self.gen_table_iv)
+
         return
 
     def to_excel(self, file=None):
@@ -252,3 +283,5 @@ class OLSFixed(object):
         df_tmp.to_excel(writer, encoding='utf-8', sheet_name='params')
         df_tmp2.to_excel(writer, encoding='utf-8', sheet_name='general', index=False)
         writer.save()
+
+

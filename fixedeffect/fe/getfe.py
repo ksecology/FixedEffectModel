@@ -1,40 +1,52 @@
 import numpy as np
 import networkx as nx
 import pandas as pd
-from .Projection import projection
+from fixedeffect.utils.Projection import projection
 from scipy.stats import t
-from time import sleep
-import tracemalloc
 
-def getfe(result, epsilon=1e-8, normalize = False, category_input = []):
+def getfe(result,
+          epsilon=1e-8,
+          normalize = False,
+          category_input = []):
     """
-
     This function is used to get fixed effect.
     :param result: result of model after demean
     :param epsilon: tolerance for projection
     :return: dataframe of fixed effect for each category variable
     """
-    data_df      = result.data_df.copy()
-    demean       = result.demeaned_df.copy()
-    coeff        = result.params.values
-    consist_col  = result.consist_col
-    old_x        = result.old_x
-    category_col = result.category_col
+
+
+    if (category_input==[]) and (result.category_input==[]):
+        raise NameError('no category_input to compute fixedeffect')
+
+    data_df = result.data_df.copy()
+    demean = result.demeaned_df.copy()
+    coeff = result.params.values
+    exog_x = result.exog_x
+
+    if result.endog_x:
+        old_x = exog_x + result.endog_x
+        if 'const' in result.x_second_stage:
+            old_x = ['const'] + old_x
+    else:
+        old_x = exog_x
+
+    category_col = result.category_input
     treatment_input = result.treatment_input
     
     #if no category_input,default all category_col
     if category_input == []:
-        category_col_specified = result.category_col
+        category_col_specified = category_col
         if treatment_input:
             if treatment_input['effect']=='group':
-                category_col_specified = [result.category_col[1]]
+                category_col_specified = [category_col[1]]
     else: #calculate user specify fe
         category_col_specified = category_input
 
-    #category_col = result.category_col
-    out_col      = result.out_col
-    df           = result.df
-    vc           = result.variance_matrix
+
+    out_col = result.dependent
+    df = result.df
+    vc = result.variance_matrix
 
     #loop through old_x to see if const is included, if not add
     k0 = 0
@@ -42,8 +54,6 @@ def getfe(result, epsilon=1e-8, normalize = False, category_input = []):
         k0 = 1
         data_df['const'] = 1            
 
-    # print('b_x shape:', b_x.shape)
- 
     #-------------------------- begin if normalize is true --------------------------#
     #-------------------------- match result of R package flm  ----------------------#
     if normalize is True: 
@@ -135,67 +145,65 @@ def getfe(result, epsilon=1e-8, normalize = False, category_input = []):
                 output_dummy_df = pd.concat([output_dummy_df, filtered_df])
         else:
             output_dummy_df = dummy_df
-
-        
-    
-    #-------------------------- finish if normalize is true --------------------------#   
+    # -------------------------- finish if normalize is true --------------------------#
     else:
-    #-------------------------- begin if normalize is false --------------------------#
-    #--------------------- match R package plm and Greene's textbook formula ---------#
+        # -------------------------- begin if normalize is false --------------------------#
+        # --------------------- match R package plm and Greene's textbook formula ---------#
         demean_y = demean[out_col[0]].values
         demean_b_x = np.dot(coeff, demean[old_x].values.T)
-        ori_resid  = demean_y - demean_b_x
-        sigma_e2   = (ori_resid**2).sum()/df
+        ori_resid = demean_y - demean_b_x
+        sigma_e2 = (ori_resid ** 2).sum() / df
 
         c_i_name_all = []
         c_i_all = []
         se_c_i_all = []
-        for cat in category_col_specified:    
-            mean_df = data_df.groupby(cat)[old_x+out_col].transform('mean')
+        for cat in category_col_specified:
+            mean_df = data_df.groupby(cat)[old_x + out_col].transform('mean')
             mean_df[cat] = data_df[cat]
             group_id = pd.DataFrame(data_df[cat].value_counts().sort_index())
             group_mean = mean_df.groupby(cat).first()
-            x_group_mean = pd.DataFrame([]) 
-            #this is to process duplicate independent variable
+            x_group_mean = pd.DataFrame([])
+            # this is to process duplicate independent variable
             for xvar in old_x:
                 if isinstance(group_mean[xvar], pd.Series) == True:
                     a = group_mean[xvar]
                 else:
-                    a = group_mean[xvar].iloc[:,0].to_frame()
-                x_group_mean = pd.concat((x_group_mean, a), axis = 1)                        
-            y_group_mean = group_mean[out_col[0]]                                    
-            
+                    a = group_mean[xvar].iloc[:, 0].to_frame()
+                x_group_mean = pd.concat((x_group_mean, a), axis=1)
+            y_group_mean = group_mean[out_col[0]]
+
             # add dummy variables name
-            c_i_name = pd.DataFrame([]) 
-            group_name = group_id.columns.tolist() 
+            c_i_name = pd.DataFrame([])
+            group_name = group_id.columns.tolist()
             c_i_name['dummy_name'] = group_id.index
             c_i_name['dummy_name'] = group_name[0] + c_i_name['dummy_name'].astype(str)
 
             x_mean_b = np.dot(coeff, x_group_mean.values.T)
             c_i = y_group_mean.values - x_mean_b
-            
-            #xe = np.dot(x_group_mean.values.astype(np.float32), vc.values.astype(np.float32))
+
+            # xe = np.dot(x_group_mean.values.astype(np.float32), vc.values.astype(np.float32))
             xe = np.dot(x_group_mean.values.astype(np.float32), vc.astype(np.float32))
             ngroup = xe.shape[0]
-            
-            xex = np.zeros((ngroup,1))
+
+            xex = np.zeros((ngroup, 1))
             B = x_group_mean.values.astype(np.float32).T
             for i in range(xex.shape[0]):
-                xex[i,:] = xe[i,:].dot(B[:,i])
-            se_c_i = np.zeros((ngroup,1))
+                xex[i, :] = xe[i, :].dot(B[:, i])
+            se_c_i = np.zeros((ngroup, 1))
             for i in range(xex.shape[0]):
-                se_c_i[i,0] = np.sqrt(xex[i,0]+sigma_e2/group_id[cat].iloc[i])
-            
-            #xe = np.dot(x_group_mean.values, vc)
-            #xex = np.dot(xe, x_group_mean.values.T)
-            #v_c_i = np.zeros((group_id.shape[0],group_id.shape[0]))
-            #for i in range(xex.shape[1]):
+                se_c_i[i, 0] = np.sqrt(xex[i, 0] + sigma_e2 / group_id[cat].iloc[i])
+
+            # xe = np.dot(x_group_mean.values, vc)
+            # xex = np.dot(xe, x_group_mean.values.T)
+            # v_c_i = np.zeros((group_id.shape[0],group_id.shape[0]))
+            # for i in range(xex.shape[1]):
             #    v_c_i[:,i] = xex[:,i]+(sigma_e2/group_id[cat])
-            #se_c_i = np.sqrt(np.diag(v_c_i))  
-            c_i_all = np.append(c_i_all,c_i)
-            se_c_i_all = np.append(se_c_i_all,se_c_i)
-            c_i_name_all = np.append(c_i_name_all,c_i_name)                    
-    
+            # se_c_i = np.sqrt(np.diag(v_c_i))
+            c_i_all = np.append(c_i_all, c_i)
+            se_c_i_all = np.append(se_c_i_all, se_c_i)
+            c_i_name_all = np.append(c_i_name_all, c_i_name)
+
+
         dummy_df = pd.DataFrame([])    
         dummy_df['dummy_name'] = c_i_name_all
         dummy_df['effect'] = c_i_all

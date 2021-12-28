@@ -14,8 +14,14 @@ dependencies = [
     'networkx>=2.5',
 ]
 
+with open(os.path.join(os.path.dirname(__file__), "fixedeffect", "_version.py")) as file:
+    for line in file:
+        m = re.fullmatch("__version__ = '([^']+)'\n", line)
+        if m:
+            version = m.group(1)
+
 setup(name='FixedEffectModel',
-      version='0.0.3',
+      version=version,
       description='Solutions to linear model with high dimensional fixed effects.',
       long_description=readme(),
       long_description_content_type="text/markdown",
