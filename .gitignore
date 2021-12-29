@@ -1,1 +1,19 @@
 .DS_Store
+
+# virtualenv
+.venv
+venv/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Distribution / packaging
+.Python
+env/
+build/
+develop-eggs/
+dist/
+*.egg-info/
+wheels/
+
+.idea/
