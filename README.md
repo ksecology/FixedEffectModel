@@ -1,8 +1,6 @@
 FixedEffectModel: A Python Package for Linear Model with High Dimensional Fixed Effects.
 =======================
-<img width="150" src="https://user-images.githubusercontent.com/61887305/126601384-35ab02e9-447c-4977-8d29-aa89397727bd.png" alt="Logo" />
-
-
+<img width="223" alt="image" src="https://user-images.githubusercontent.com/61887305/154887555-abd074bc-e69d-4793-b850-94a0ce437b01.png">
 
 [![Downloads](https://pepy.tech/badge/fixedeffectmodel)](https://pepy.tech/project/fixedeffectmodel)
 [![Downloads](https://pepy.tech/badge/fixedeffectmodel/month)](https://pepy.tech/project/fixedeffectmodel)
@@ -271,6 +269,29 @@ Return an object of results:
 
 Return the same object of results as fixedeffect does.
 
+We also provide two-step GMM estimator if you set thet option "gmm2=True".
+Define a matrix <img src="https://latex.codecogs.com/svg.image?P_Z&space;=&space;Z(Z'Z)^{-1}Z'" title="P_Z = Z(Z'Z)^{-1}Z'" />
+
+- "ivgmm", the one-step GMM estimator generate 
+<img src="https://latex.codecogs.com/svg.image?\begin{equation}\beta_{2SLS}&space;=&space;(X'&space;P_Z&space;X)^{-1}(X'&space;P_Z&space;y)\end{equation}" title="\begin{equation}\beta_{2SLS} = (X' P_Z X)^{-1}(X' P_Z y)\end{equation}" /> with variance-covariance matrices equal
+  - Unadjusted. Define <img src="https://latex.codecogs.com/svg.image?\sigma_u^2=u'u/df" title="\sigma_u^2=u'u/df" />, the variance-covariance matrix is <img src="https://latex.codecogs.com/svg.image?Var(\beta)=\sigma_u^2[X'Z(Z'Z)^{-1}Z'X]^{-1}" title="Var(\beta)=\sigma_u^2[X'Z(Z'Z)^{-1}Z'X]^{-1}" />
+  - Heteroskedasticity robust. Define <img src="https://latex.codecogs.com/svg.image?\hat{\Omega}=&space;diag(\hat{u}_1^2,\dotsm,&space;\hat{u}_N^2)" title="\hat{\Omega}= diag(\hat{u}_1^2,\dotsm, \hat{u}_N^2)" /> and <img src="https://latex.codecogs.com/svg.image?W_2&space;=&space;Z'\hat{\Omega}&space;Z" title="W_2 = Z'\hat{\Omega} Z" />
+  , the variance-covariance matrix is <img src="https://latex.codecogs.com/svg.image?Var_r(\beta)=[X'P_z&space;X]^{-1}[X'Z(Z'Z)^{-1}&space;W_2&space;(Z'Z)^{-1}&space;Z'X][X'&space;P_z&space;X]^{-1}" title="Var_r(\beta)=[X'P_z X]^{-1}[X'Z(Z'Z)^{-1} W_2 (Z'Z)^{-1} Z'X][X' P_z X]^{-1}" />
+  - Cluster. Deine <img src="https://latex.codecogs.com/svg.image?W_2&space;=&space;\sum_g&space;Z_g'u_g&space;u_g'&space;Z_g" title="W_2 = \sum_g Z_g'u_g u_g' Z_g" />
+  , the variance-covariance matrix is  <img src="https://latex.codecogs.com/svg.image?Var_c(\beta)=[X'P_z&space;X]^{-1}[X'Z(Z'Z)^{-1}&space;W_2&space;(Z'Z)^{-1}&space;Z'X][X'&space;P_z&space;X]^{-1}" title="Var_c(\beta)=[X'P_z X]^{-1}[X'Z(Z'Z)^{-1} W_2 (Z'Z)^{-1} Z'X][X' P_z X]^{-1}" />
+- "ivgmm" with "gmm2=True", the two-step GMM estimator generate <img src="https://latex.codecogs.com/svg.image?\begin{equation}\beta_{GMM}&space;=&space;[X'&space;Z&space;W_2^{-1}Z'&space;X]^{-1}[X'&space;Z&space;W_2^{-1}Z'&space;Xy]\end{equation}" title="\begin{equation}\beta_{GMM} = [X' Z W_2^{-1}Z' X]^{-1}[X' Z W_2^{-1}Z' Xy]\end{equation}" />
+  - Unadjusted. <img src="https://latex.codecogs.com/svg.image?Var(\beta_{GMM})&space;=&space;(X'ZW_2^{-1}Z'X)^{-1}" title="Var(\beta_{GMM}) = (X'ZW_2^{-1}Z'X)^{-1}" />
+  - Heteroskedasticity robust. Define <img src="https://latex.codecogs.com/svg.image?W_3=Z'\Omega_2&space;Z" title="W_3=Z'\Omega_2 Z" />
+  and <img src="https://latex.codecogs.com/svg.image?\Omega_2" title="\Omega_2" /> as the 
+  diagonal matrix generated using the residual from the two-step GMM.
+  , the variance-covariance matrix is <img src="https://latex.codecogs.com/svg.image?\begin{equation}Var_r(\beta_{GMM})=[X'Z(W_2)^{-1}Z'X]^{-1}&space;[X'Z(W_2)^{-1}W_3(W_2)^{-1}Z'X]&space;[X'Z(W_2)^{-1}Z'X]^{-1}\end{equation}" title="\begin{equation}Var_r(\beta_{GMM})=[X'Z(W_2)^{-1}Z'X]^{-1} [X'Z(W_2)^{-1}W_3(W_2)^{-1}Z'X] [X'Z(W_2)^{-1}Z'X]^{-1}\end{equation}" />
+  - Cluster. Define 
+
+  <img src="https://latex.codecogs.com/svg.image?\begin{aligned}&W_2&space;=&space;\sum_g&space;Z_g'u_g&space;u_g'&space;Z_g\\&W_3&space;=&space;\sum_g&space;Z_g'u_{2,g}&space;u_{2,g}'&space;Z_g\\\end{aligned}" title="\begin{aligned}&W_2 = \sum_g Z_g'u_g u_g' Z_g\\&W_3 = \sum_g Z_g'u_{2,g} u_{2,g}' Z_g\\\end{aligned}" />
+
+  , the variance-covariance matrix is <img src="https://latex.codecogs.com/svg.image?\begin{equation}Var_c(\beta_{GMM})=[X'Z(W_2)^{-1}Z'X]^{-1}&space;[X'Z(W_2)^{-1}W_3(W_2)^{-1}Z'X]&space;[X'Z(W_2)^{-1}Z'X]^{-1}\end{equation}" title="\begin{equation}Var_c(\beta_{GMM})=[X'Z(W_2)^{-1}Z'X]^{-1} [X'Z(W_2)^{-1}W_3(W_2)^{-1}Z'X] [X'Z(W_2)^{-1}Z'X]^{-1}\end{equation}" />.
+
+
 ### DID
 *model = did (data_df = None, dependent = None, exog_x = None, treatment = None, csid = None, tsid = None, exp_date = None, group_effect = 'treatment', cluster = None, formula = None, robust = False, noint = False, c_method = 'cgm', psdef = True)*
 
@@ -370,6 +391,7 @@ result.summary()
 ivtest(result)
 
 #------------------------------#
+
 #define fixed effect model
 exog_x = ['x_1']
 y = ['y']

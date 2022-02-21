@@ -13,18 +13,19 @@ import numpy as np
 import pandas as pd
 import warnings
 
+
 class iv2sls:
     def __init__(self,
                  data_df,
-                 dependent = None,
-                 exog_x = None,
-                 endog_x = [],
-                 iv = [],
+                 dependent=None,
+                 exog_x=None,
+                 endog_x=[],
+                 iv=[],
                  category=[],
                  cluster=[],
-                 formula = None,
-                 robust = False,
-                 noint = False,
+                 formula=None,
+                 robust=False,
+                 noint=False,
                  **kwargs
                  ):
         """
@@ -42,6 +43,7 @@ class iv2sls:
         **kwargs:some hidden option not supposed to be used by user
         """
 
+        warnings.warn('"iv2sls" will no longer be supported beyond version 0.0.5, please use "ivgmm" instead')
 
         # grammar check
         if (exog_x is None) & (formula is None):
@@ -59,8 +61,8 @@ class iv2sls:
                 raise NameError('You have to input endogenous variables for iv2sls')
 
         else:
-            dependent, exog_x, category_input, cluster_input, endog_x, iv = dependent, exog_x, category,  \
-                                                                              cluster, endog_x, iv
+            dependent, exog_x, category_input, cluster_input, endog_x, iv = dependent, exog_x, category, \
+                                                                            cluster, endog_x, iv
 
         # df preprocess
         data_df.fillna(0, inplace=True)
@@ -80,8 +82,8 @@ class iv2sls:
         self.orignal_exog_x = orignal_exog_x
 
     def fit(self,
-            epsilon = 1e-8,
-            max_iter = 1e6):
+            epsilon=1e-8,
+            max_iter=1e6):
 
         data_df = self.data_df
         dependent = self.dependent
@@ -115,7 +117,7 @@ class iv2sls:
             for i in iv:
                 all_cols.append(i)
             all_cols.append(dependent[0])
-            demeaned_df = demean_dataframe(data_df, all_cols, category_input, epsilon = epsilon, max_iter = max_iter)
+            demeaned_df = demean_dataframe(data_df, all_cols, category_input, epsilon=epsilon, max_iter=max_iter)
             if noint is False:
                 for i in all_cols:
                     demeaned_df[i] = demeaned_df[i].add(data_df[i].mean())
@@ -127,9 +129,8 @@ class iv2sls:
         iv_model = []
         iv_result = []
         endog_x_hat = []
-        
 
-        #-----------------  First stage -------------------#
+        # -----------------  First stage -------------------#
         # if OLS on raw data:
         if noint is False:
             const_x_first_stage = sm.add_constant(demeaned_df[x_first_stage], has_constant='add')
@@ -155,10 +156,10 @@ class iv2sls:
         x_second_stage = exog_x + endog_x_hat
         x_second_stage_original = exog_x + endog_x
 
-        #----------------- Second stage  -----------------#
+        # ----------------- Second stage  -----------------#
         # if OLS on raw data:
         if noint is False:
-            #x_second_stage_ = sm.add_constant(demeaned_df[x_second_stage])
+            # x_second_stage_ = sm.add_constant(demeaned_df[x_second_stage])
             x_first_stage = ['const'] + x_first_stage
             x_second_stage = ['const'] + x_second_stage
             x_second_stage_original = ['const'] + x_second_stage_original
@@ -173,7 +174,7 @@ class iv2sls:
         n = demeaned_df.shape[0]
         k = len(x_second_stage)
 
-        #------ initiate result object ------#
+        # ------ initiate result object ------#
         f_result = OLSFixed()
         f_result.model = 'iv2sls'
         f_result.dependent = dependent
@@ -197,13 +198,11 @@ class iv2sls:
         else:
             std_error = result.bse * np.sqrt((n - k) / (n - k + k0 - rank))  # for fe if k0=1 need to add it back
         f_result.bse = std_error
-        
 
         # compute summary statistics and save in result
         self.compute_summary_statistics(result, f_result, rank)
 
         return f_result
-
 
     def compute_summary_statistics(self,
                                    result,
@@ -215,7 +214,6 @@ class iv2sls:
         data_df = self.data_df
 
         x_second_stage = f_result.x_second_stage
-
 
         if self.noint is True:
             k0 = 0
@@ -246,7 +244,6 @@ class iv2sls:
             f_result.rsquared = 1 - proj_rss / proj_tss
         else:
             raise NameError('Total sum of square equal 0, program quit.')
-
 
         f_result.rsquared_adj = 1 - (len(data_df) - k0) / (result.df_resid) * (1 - f_result.rsquared)
 
@@ -281,7 +278,6 @@ class iv2sls:
                 f_result.fvalue = w / result.df_model
         else:
             f_result.fvalue = 0
-
 
         f_result.f_pvalue = f.sf(f_result.fvalue, result.df_model, f_result.df)
         f_result.f_df_proj = [result.df_model, f_result.df]

@@ -11,9 +11,9 @@ from scipy.stats import t
 from scipy.stats import f
 from numpy.linalg import eigvalsh, inv, matrix_rank, pinv
 import numpy as np
-
 import pandas as pd
 
+import warnings
 
 class ivgmm:
     def __init__(self,
@@ -27,23 +27,29 @@ class ivgmm:
                  formula = None,
                  robust = False,
                  noint = False,
+                 gmm2=False,
                  **kwargs
                  ):
         """
         :param data_df: Dataframe of relevant data
-        :param y: List of dependent variables(so far, only support one dependent variable)
+        :param dependent: List of dependent variables(so far, only support one dependent variable)
         :param exog_x: List of exogenous or right-hand-side variables (variable by time by entity).
         :param endog_x: List of endogenous variables
         :param iv: List of instrument variables
-        :param category_input: List of category variables(fixed effects)
-        :param cluster_input: List of cluster variables
+        :param category: List of category variables(fixed effects)
+        :param cluster: List of cluster variables
         :param formula: a string like 'y~x+x2|id+firm|id',dependent_variable~continuous_variable|fixed_effect|clusters
         :param robust: bool value of whether to get a robust variance
         :param noint: force nointercept option
+        :param gmm2: whether generate gmm1 or gmm2
         :return:params,df,bse,tvalues,pvalues,rsquared,rsquared_adj,fvalue,f_pvalue,variance_matrix,fittedvalues,resid,summary
         **kwargs:some hidden option not supposed to be used by user
         """
+        if len(cluster)>1:
+            raise NameError('IVGMM only support one-way cluster standard error')
 
+        if (robust==True) and (len(cluster)==1):
+            warnings.warn('Generate the cluster robust standard error and set robust=False')
 
         # grammar check
         if (exog_x is None) & (formula is None):
@@ -80,6 +86,12 @@ class ivgmm:
         self.robust = robust
         self.noint = noint
         self.orignal_exog_x = orignal_exog_x
+        self.gmm2 = gmm2
+
+        self.is_clustered = False
+        if len(cluster_input) > 0:
+            if (cluster_input[0] != '0'):
+                self.is_clustered = True
 
 
     def fit(self,
@@ -87,29 +99,106 @@ class ivgmm:
             max_iter = 1e6):
 
         data_df = self.data_df
+        demeaned_df = self.preprocess_data(epsilon, max_iter)
+
+        iv_full = self.exog_x + self.iv
+        x_full = self.exog_x + self.endog_x
+        if self.noint is False:
+            iv_full = ['const'] + iv_full
+            x_full = ['const'] + x_full
+
+        z = np.array(demeaned_df[iv_full].values)
+        x = np.array(demeaned_df[x_full].values)
+        y = np.array(demeaned_df[self.dependent].values)
+
+        # calculates the first stage F statistic
+        f_stat_first_stage, f_stat_first_stage_pval = self.compute_first_stage_f_stat(demeaned_df, data_df, z, iv_full)
+
+        # estimate parameters for one-step GMM
+        beta, v_beta, w2 = self.gmm1_estimation(z, x, y, iv_full, x_full, demeaned_df)
+
+        if self.gmm2 == True:
+            beta, v_beta = self.gmm2_estimation(z, x, y, iv_full, demeaned_df, w2)
+
+
+        result, f_result = self.save_results(x_full, beta, v_beta, demeaned_df, y, x,
+                                             f_stat_first_stage, f_stat_first_stage_pval)
+
+        self.compute_summary_statistics(result, f_result, self.rank)
+
+        return f_result
+
+    def save_results(self, x_full, beta, v_beta, demeaned_df, y, x,
+                     f_stat_first_stage, f_stat_first_stage_pval):
+
+        se = np.sqrt(np.reshape(np.diag(v_beta), (len(v_beta), 1)))
+        df = demeaned_df.shape[0] - len(x_full) - self.rank + self.k0
+
+        result = pd.DataFrame()
+        result['index'] = x_full
+        result = result.set_index('index')
+        result['params'] = beta
+        result['bse'] = se
+        result['tvalues'] = result.params / result.bse
+        result['pvalues'] = pd.Series(2 * t.sf(np.abs(result.tvalues), df), index=list(result.params.index))
+
+        # ------ initiate result object ------#
+        demeaned_df['resid'] = y - x @ beta
+
+        f_result = OLSFixed()
+        f_result.model = 'ivgmm'
+        f_result.dependent = self.dependent
+        f_result.exog_x = self.exog_x
+        f_result.endog_x = self.endog_x
+        f_result.iv = self.iv
+        f_result.category_input = self.category_input
+        f_result.data_df = self.data_df
+        f_result.demeaned_df = demeaned_df
+        f_result.params = result['params']
+        f_result.bse = result['bse']
+        f_result.df = df
+        f_result.variance_matrix = v_beta
+        f_result.tvalues = result['tvalues']
+        f_result.pvalues = result['pvalues']
+        #f_result.fittedvalues = x @ beta
+        f_result.x_second_stage = x_full
+
+        f_result.f_stat_first_stage = f_stat_first_stage
+        f_result.f_stat_first_stage_pval = f_stat_first_stage_pval
+        f_result.orignal_exog_x = self.orignal_exog_x
+        f_result.cluster = self.cluster_input
+
+        if self.cov_type == 'Heteroskedastic-Robust Covariance':
+            f_result.Covariance_Type = 'Heteroskedastic-Robust'
+            f_result.cluster_method = 'no_cluster'
+        elif self.cov_type == 'One-way Clustered Covariance':
+            f_result.Covariance_Type = 'clustered'
+            f_result.cluster_method = 'one-way'
+        else:
+            f_result.Covariance_Type = 'nonrobust'
+            f_result.cluster_method = 'no_cluster'
+
+        return result, f_result
+
+    def preprocess_data(self, epsilon, max_iter):
+        data_df   = self.data_df
         dependent = self.dependent
-        exog_x = self.exog_x
-        endog_x = self.endog_x
-        iv = self.iv
+        exog_x    = self.exog_x
+        endog_x   = self.endog_x
+        iv        = self.iv
+        noint     = self.noint
         category_input = self.category_input
-        cluster_input = self.cluster_input
-        robust = self.robust
-        noint = self.noint
-        orignal_exog_x = self.orignal_exog_x
 
         if noint is True:
-            k0 = 0
+            self.k0 = 0
         else:
-            k0 = 1
+            self.k0 = 1
 
-        # if on level data:
         if (category_input == []):
             demeaned_df = data_df.copy()
             if noint is False:
                 demeaned_df['const'] = 1
-            rank = 0
-
-        # if on demean data:
+            self.rank = 0
         else:
             all_cols = []
             for i in exog_x:
@@ -123,32 +212,90 @@ class ivgmm:
             if noint is False:
                 for i in all_cols:
                     demeaned_df[i] = demeaned_df[i].add(data_df[i].mean())
-
                 demeaned_df['const'] = 1
-            rank = cal_df(data_df, category_input)
+            self.rank = cal_df(data_df, category_input)
 
-        iv_full = exog_x + iv
-        x_full = exog_x + endog_x
+        return demeaned_df
 
-        if noint is False:
-            iv_full = ['const'] + iv_full
-            x_full = ['const'] + x_full
+    def cov_cluster(self, demeaned_df, iv_full, z):
+        id_list = np.unique(demeaned_df[self.cluster_input[0]].values)
+        w = np.zeros([z.shape[1], z.shape[1]])
+        for i in id_list:
+            demeaned_df_sub = demeaned_df[demeaned_df[self.cluster_input[0]] == i]
+            z_sub = demeaned_df_sub[iv_full].values
+            res_sub = demeaned_df_sub['resid'].values.reshape(-1, 1)
+            zres_sub_ = np.sum(z_sub * res_sub, axis=0).reshape(-1, 1)
+            w = w + zres_sub_ @ zres_sub_.T
 
-        z = demeaned_df[iv_full]
-        x = demeaned_df[x_full]
-        y = demeaned_df[dependent]
+        return w
 
-        z = np.array(z.values)
-        x = np.array(x.values)
-        y = np.array(y.values)
+    def gmm1_estimation(self, z, x, y, iv_full, x_full, demeaned_df):
+        qxz = x.T @ z
+        qzz = z.T @ z
+        qzx = z.T @ x
+        pz  = z@(pinv(z.T @ z))
 
-        #----------- first stage ----------------#
+        beta = pinv(qxz@pinv(qzz)@qzx)@x.T @ pz@z.T @y
+        resid = y - x@beta
+        demeaned_df['resid'] = resid.flatten()
+        zres = z * resid * resid
+        w2 = zres.T @ z
+        self.cov_type = 'Non-Robust Covariance'
+        df = demeaned_df.shape[0] - len(x_full) - self.rank + self.k0
+
+        if (self.robust == True) or (self.is_clustered == True):
+            bread = pinv(qxz@pinv(qzz)@qzx)
+            if self.robust==True:
+                self.cov_type = 'Heteroskedastic-Robust Covariance'
+            else:
+                self.cov_type = 'One-way Clustered Covariance'
+                w2 = self.cov_cluster(demeaned_df, iv_full, z)
+
+            mid1 = qxz @ pinv(qzz)
+            meat = mid1 @ w2 @ mid1.T
+            v_beta = bread @ meat @ bread
+        else:
+            sigma2_hat = (resid.T @ resid) / df
+            var_1 = pinv(x.T @ pz @ z.T @ x)
+            v_beta = sigma2_hat * var_1
+
+        return beta, v_beta, w2
+
+
+    def gmm2_estimation(self, z, x, y, iv_full, demeaned_df, w2):
+        qxz = x.T @ z
+        qzx = z.T @ x
+        qzy = z.T @ y
+
+        xpx = qxz @ pinv(w2) @ qzx
+        xpy = qxz @ pinv(w2) @ qzy
+        beta = pinv(xpx) @ xpy
+
+        if (self.robust == True) or (self.is_clustered == True):
+            res2 = y - x @ beta
+            bread = pinv(xpx)
+            if self.robust == True:
+                zres2 = z * res2 * res2
+                w3 = zres2.T @ z
+            else:
+                demeaned_df['resid'] = res2
+                w3 = self.cov_cluster(demeaned_df, iv_full, z)
+            mid1 = qxz @ pinv(w2)
+            meat = mid1 @ w3 @ mid1.T
+            v_beta = bread @ meat @ bread
+        else:
+            mid1 = qxz @ pinv(w2)
+            v_beta = pinv(mid1 @ qzx)
+        return beta, v_beta
+
+
+    def compute_first_stage_f_stat(self, demeaned_df, data_df, z, iv_full):
         iv_model = []
         iv_result = []
         f_stat_first_stage = []
         f_stat_first_stage_pval = []
 
-        for i in endog_x:
+        for i in self.endog_x:
             model_iv = sm.OLS(demeaned_df[i], z)
             result_iv = model_iv.fit()
             iv_model.append(model_iv)
@@ -160,65 +307,7 @@ class ivgmm:
             f_stat_first_stage.append(result_iv.fvalue)
             f_stat_first_stage_pval.append(result_iv.f_pvalue)
 
-
-        #----------- gmm ----------------#
-        qxz = x.T @ z # k by l
-        qzz = z.T @ z # l by l
-        qzx = z.T @ x # l by k
-        pz  = z@(pinv(z.T @ z)) #n by l
-        
-        
-        beta = pinv(qxz@pinv(qzz)@qzx)@x.T @ pz@z.T @y
-        resid = y - x@beta
-        sigma2_hat = (resid.T@resid)/resid.shape[0]
-
-        var_1 = pinv(x.T @ pz@z.T @ x)
-        
-        v_beta = sigma2_hat*var_1
-        se = np.sqrt(np.reshape(np.diag(v_beta), (len(v_beta),1)))
-
-        k = len(x_full)
-        df = resid.shape[0] - k - rank + k0
-
-        result = pd.DataFrame()
-        result['index'] = x_full
-        result = result.set_index('index')
-        result['params'] = beta
-        result['bse'] = se
-        result['tvalues'] = result.params / result.bse
-        result['pvalues'] = pd.Series(2 * t.sf(np.abs(result.tvalues), df), index=list(result.params.index))
-
-        #------ initiate result object ------#
-        demeaned_df['resid'] = resid
-
-        f_result = OLSFixed()
-        f_result.model = 'ivgmm'
-        f_result.dependent = dependent
-        f_result.exog_x = exog_x
-        f_result.endog_x = endog_x
-        f_result.iv = iv
-        f_result.category_input = category_input
-        f_result.data_df = data_df.copy()
-        f_result.demeaned_df = demeaned_df
-        f_result.params = result['params']
-        f_result.bse = result['bse']
-        f_result.df = df
-        f_result.variance_matrix = v_beta
-        f_result.tvalues = result['tvalues']
-        f_result.pvalues = result['pvalues']
-        f_result.fittedvalues = x@beta
-        f_result.x_second_stage = x_full
-
-        f_result.f_stat_first_stage = f_stat_first_stage
-        f_result.f_stat_first_stage_pval = f_stat_first_stage_pval
-        f_result.orignal_exog_x = orignal_exog_x
-        f_result.cluster = []
-
-        self.compute_summary_statistics(result, f_result, rank)
-
-        return f_result
-
-
+        return f_stat_first_stage, f_stat_first_stage_pval
 
     def compute_summary_statistics(self,
                                    result,
@@ -239,6 +328,7 @@ class ivgmm:
         if noint is False:
             iv_full = ['const'] + iv_full
             x_full = ['const'] + x_full
+
         if self.noint is True:
             k0 = 0
         else:
@@ -252,7 +342,7 @@ class ivgmm:
         proj_rss = sum(f_result.resid ** 2)
         proj_rss = float("{:.8f}".format(proj_rss))  # round up
 
-        # calculate totoal sum squared of error
+        # calculate total sum squared of error
         if k0 == 0:
             proj_tss = sum(((demeaned_df[dependent]) ** 2).values)[0]
         else:
@@ -263,7 +353,6 @@ class ivgmm:
             f_result.rsquared = 1 - proj_rss / proj_tss
         else:
             raise NameError('Total sum of square equal 0, program quit.')
-
 
         f_result.rsquared_adj = 1 - (len(data_df) - k0) / n * (1 - f_result.rsquared)
 
@@ -288,7 +377,6 @@ class ivgmm:
 
         # calculate f-statistics
         df_model = k - k0
-
         if df_model > 0:
             # if do pooled regression
             if category_input == []:
@@ -319,12 +407,7 @@ class ivgmm:
         f_result.xname = x_full
         f_result.resid_std_err = np.sqrt(sum(f_result.resid ** 2) / (f_result.df - rank))
 
-        f_result.cluster_method = 'no_cluster'
-        f_result.Covariance_Type = 'nonrobust'
         f_result.treatment_input = None
-
-
-
 
         return
 
